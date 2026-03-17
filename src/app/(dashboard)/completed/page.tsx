@@ -28,6 +28,7 @@ import {
 } from '@/lib/actions/rake-completion';
 import { TARGET_DURATIONS } from '@/lib/constants';
 import { formatDateIST } from '@/lib/utils/date';
+import { DotsLoader } from '@/components/ui/dots-loader';
 
 export default function CompletedRakesPage() {
   const { selectedShedId, sheds } = useShed();
@@ -209,7 +210,7 @@ export default function CompletedRakesPage() {
       {/* Rakes List */}
       {loading ? (
         <div className="flex h-40 items-center justify-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+          <DotsLoader size="lg" color="blue" />
         </div>
       ) : rakes.length === 0 ? (
         <div className="flex h-40 flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50">
@@ -278,7 +279,7 @@ export default function CompletedRakesPage() {
                 <div className="border-t border-gray-100 px-4 py-3">
                   {detailLoading ? (
                     <div className="flex h-20 items-center justify-center">
-                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+                      <DotsLoader size="md" color="blue" />
                     </div>
                   ) : rakeDetail ? (
                     <ComparisonView detail={rakeDetail} />

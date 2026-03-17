@@ -8,6 +8,7 @@ import { RoleGuard } from '@/components/auth/role-guard';
 import { fetchUsers } from '@/lib/actions/admin-users';
 import { UserListTable } from '@/components/admin/user-list-table';
 import type { UserRecord } from '@/types';
+import { DotsLoader } from '@/components/ui/dots-loader';
 
 export default function SettingsUsersPage() {
   return (
@@ -54,7 +55,7 @@ function UserManagementContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+        <DotsLoader size="lg" color="blue" />
       </div>
     );
   }

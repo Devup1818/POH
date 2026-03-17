@@ -5,6 +5,7 @@ import { ChevronDown, Building2, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useShed } from '@/lib/shed-context';
 import { createClient } from '@/lib/supabase/client';
+import { isAuthEnabled, DEV_USER } from '@/lib/dev-auth';
 
 export interface Shed {
   id: string;
@@ -28,9 +29,16 @@ export function ShedSelector({ className }: ShedSelectorProps) {
     async function fetchUserSheds() {
       try {
         const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        let userId: string | null = null;
 
-        if (!user) {
+        if (isAuthEnabled) {
+          const { data: { user } } = await supabase.auth.getUser();
+          userId = user?.id ?? null;
+        } else {
+          userId = DEV_USER.id;
+        }
+
+        if (!userId) {
           // No auth session — use context sheds
           setUserSheds(contextSheds.map((s) => ({ id: s.id, name: s.name })));
           setLoaded(true);
@@ -41,10 +49,10 @@ export function ShedSelector({ className }: ShedSelectorProps) {
         const { data: profile } = await supabase
           .from('users')
           .select('role')
-          .eq('id', user.id)
+          .eq('id', userId)
           .single();
 
-        const userIsAdmin = profile?.role === 'Admin';
+        const userIsAdmin = profile?.role === 'Admin' || (!isAuthEnabled && !profile);
         setIsAdmin(userIsAdmin);
 
         if (userIsAdmin) {
@@ -63,7 +71,7 @@ export function ShedSelector({ className }: ShedSelectorProps) {
           const { data: assignments } = await supabase
             .from('user_shed_assignments')
             .select('is_primary, sheds:shed_id(id, name)')
-            .eq('user_id', user.id);
+            .eq('user_id', userId);
 
           if (assignments && assignments.length > 0) {
             const sheds: Shed[] = assignments
@@ -118,7 +126,7 @@ export function ShedSelector({ className }: ShedSelectorProps) {
         aria-haspopup="listbox"
         aria-expanded={isOpen}
       >
-        <Building2 className="h-4 w-4 text-gray-500" />
+        <Building2 className="h-4 w-4 text-amber-500" />
         <span className="hidden sm:inline max-w-[180px] truncate">{current.name}</span>
         <span className="sm:hidden max-w-[100px] truncate text-xs">{current.name}</span>
         <ChevronDown

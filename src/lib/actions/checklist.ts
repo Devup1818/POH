@@ -120,6 +120,33 @@ export async function updateChecklistItem(
   return { success: true, data: undefined };
 }
 
+/* ── bulkMarkChecklistComplete ────────────────────────────── */
+
+/**
+ * Mark all incomplete checklist items for a coach as Completed in a single query.
+ */
+export async function bulkMarkChecklistComplete(
+  coachId: string,
+): Promise<Result<{ updatedCount: number }>> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from('coach_checklist_items')
+    .update({
+      status: 'Completed',
+      completion_date: now,
+      completed_by: user?.id ?? null,
+    })
+    .eq('coach_id', coachId)
+    .neq('status', 'Completed')
+    .select('id');
+
+  if (error) return { success: false, error: error.message };
+  return { success: true, data: { updatedCount: data?.length ?? 0 } };
+}
+
 /* ── updateChecklistItemNotes ────────────────────────────── */
 
 /**

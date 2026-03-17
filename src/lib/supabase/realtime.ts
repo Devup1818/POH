@@ -104,3 +104,75 @@ export function useCoachPartsRealtime(
     };
   }, [coachId, stableOnUpdate]);
 }
+
+
+/**
+ * Hook that subscribes to real-time changes on coaches and coach_parts
+ * for a specific rake. Also refreshes data when the page regains visibility
+ * (e.g. user navigates back from a coach detail page).
+ */
+export function useRakeDetailRealtime(
+  rakeId: string,
+  onUpdate: () => void,
+) {
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const stableOnUpdate = useCallback(onUpdate, [onUpdate]);
+
+  // Supabase real-time subscription for coaches + parts changes
+  useEffect(() => {
+    if (!rakeId) return;
+    const supabase = createClient();
+
+    const channel = supabase
+      .channel(`rake-detail-${rakeId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'coaches',
+          filter: `rake_id=eq.${rakeId}`,
+        },
+        () => stableOnUpdate(),
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'coach_parts',
+        },
+        () => stableOnUpdate(),
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'coach_stage_history',
+        },
+        () => stableOnUpdate(),
+      )
+      .subscribe();
+
+    channelRef.current = channel;
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, [rakeId, stableOnUpdate]);
+
+  // Refresh when page regains visibility (user navigates back)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        stableOnUpdate();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [stableOnUpdate]);
+}

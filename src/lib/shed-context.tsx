@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { getSheds } from '@/lib/queries/dashboard';
 import { createClient } from '@/lib/supabase/client';
+import { isAuthEnabled, DEV_USER } from '@/lib/dev-auth';
 
 export interface ShedInfo {
   id: string;
@@ -39,18 +40,26 @@ export function ShedProvider({ children }: { children: ReactNode }) {
         const allSheds = await getSheds();
         setSheds(allSheds);
 
-        // Determine the correct default shed based on user role
         const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        let userId: string | null = null;
 
-        if (user) {
+        if (isAuthEnabled) {
+          const { data: { user } } = await supabase.auth.getUser();
+          userId = user?.id ?? null;
+        } else {
+          userId = DEV_USER.id;
+        }
+
+        if (userId) {
           const { data: profile } = await supabase
             .from('users')
             .select('role')
-            .eq('id', user.id)
+            .eq('id', userId)
             .single();
 
-          if (profile?.role === 'Admin') {
+          const role = profile?.role ?? (!isAuthEnabled ? DEV_USER.role : null);
+
+          if (role === 'Admin') {
             // Admin defaults to 'all' to see all sheds
             setSelectedShedId('all');
           } else {
@@ -58,7 +67,7 @@ export function ShedProvider({ children }: { children: ReactNode }) {
             const { data: assignments } = await supabase
               .from('user_shed_assignments')
               .select('shed_id, is_primary')
-              .eq('user_id', user.id);
+              .eq('user_id', userId);
 
             if (assignments && assignments.length > 0) {
               const primary = assignments.find((a) => a.is_primary);

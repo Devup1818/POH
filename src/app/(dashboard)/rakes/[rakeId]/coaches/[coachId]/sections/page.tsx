@@ -6,6 +6,7 @@ import { SectionCard } from '@/components/sections/section-card';
 import { JobCardExportButton } from '@/components/sections/job-card-export-button';
 import { GenerateJobCardButton } from '@/components/sections/generate-job-card-button';
 import { createClient } from '@/lib/supabase/server';
+import { getEffectiveUser } from '@/lib/supabase/dev-session';
 
 interface SectionDashboardPageProps {
   params: Promise<{ rakeId: string; coachId: string }>;
@@ -23,7 +24,7 @@ export default async function SectionDashboardPage({ params }: SectionDashboardP
   let isAdmin = false;
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getEffectiveUser();
     if (user) {
       const { data: profile } = await supabase
         .from('users')

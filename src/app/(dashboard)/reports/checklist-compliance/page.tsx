@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { PerformanceChart } from '@/components/reports/performance-chart';
 import { ReportFiltersBar } from '@/components/reports/report-filters';
 import { ExportButtons } from '@/components/reports/export-buttons';
+import { DotsLoader } from '@/components/ui/dots-loader';
 
 export default function ChecklistCompliancePage() {
   const { selectedShedId } = useShed();
@@ -58,7 +59,7 @@ export default function ChecklistCompliancePage() {
 
       {isLoading && (
         <div className="flex h-40 items-center justify-center">
-          <div className="h-7 w-7 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+          <DotsLoader size="lg" color="blue" />
         </div>
       )}
 

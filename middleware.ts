@@ -11,6 +11,11 @@ const OTP_VERIFY_ROUTE = '/login/verify-otp';
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
 
 export async function middleware(request: NextRequest) {
+  // When auth is disabled, skip all auth checks and let requests through
+  if (process.env.NEXT_PUBLIC_AUTH_ENABLED === 'false') {
+    return NextResponse.next();
+  }
+
   // Refresh the Supabase auth session and get user in a single call
   const { response, user, supabase } = await updateSession(request);
 

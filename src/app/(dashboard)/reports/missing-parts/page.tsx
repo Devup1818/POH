@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
 import { ExportButtons } from '@/components/reports/export-buttons';
 import { formatDateIST } from '@/lib/utils/date';
+import { DotsLoader } from '@/components/ui/dots-loader';
 
 function isOverdue(dateStr: string | null): boolean {
   if (!dateStr) return false;
@@ -180,7 +181,7 @@ export default function MissingPartsReportPage() {
       {/* Loading */}
       {(loading || isPending) && (
         <div className="flex h-32 items-center justify-center">
-          <div className="h-7 w-7 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
+          <DotsLoader size="lg" color="blue" />
         </div>
       )}
 

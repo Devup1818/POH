@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { getEffectiveUser } from '@/lib/supabase/dev-session';
 import type { SectionDashboardData, SectionProgressSummary, CoachType, SectionCode } from '@/types';
 import { SECTION_COACH_TYPE_APPLICABILITY } from '@/lib/constants';
 
@@ -133,7 +134,7 @@ export async function getCoachSectionDashboard(coachId: string): Promise<Section
 // Get current user's assigned section for SSE highlighting
 export async function getUserAssignedSection(): Promise<string | null> {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getEffectiveUser();
   if (!user) return null;
 
   const { data } = await supabase

@@ -1,8 +1,8 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import type { PartStatus, Result } from '@/types';
-import { PART_STATUS_ORDER } from '@/lib/constants';
+import type { PartStatus, POHStage, Result } from '@/types';
+import { PART_STATUS_ORDER, PART_STATUS_TO_COMPLETED_STAGE, POH_STAGE_ORDER, TARGET_DURATIONS } from '@/lib/constants';
 
 /* ── Types ───────────────────────────────────────────────── */
 
@@ -94,7 +94,128 @@ export async function updatePartStatus(
     .eq('id', partId);
 
   if (error) return { success: false, error: error.message };
+
   return { success: true, data: undefined };
+}
+
+/* ── autoAdvanceCoachStage ────────────────────────────────── */
+
+/**
+ * After a part status update, check if all parts for the coach have reached
+ * a threshold that completes stages beyond the current one. If so, advance
+ * the coach through each intermediate stage, creating proper history entries.
+ */
+async function autoAdvanceCoachStage(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  partId: string,
+) {
+  try {
+    // Get the coach for this part
+    const { data: part } = await supabase
+      .from('coach_parts')
+      .select('coach_id')
+      .eq('id', partId)
+      .single();
+    if (!part) return;
+
+    const coachId = part.coach_id;
+
+    // Get all parts for this coach
+    const { data: allParts } = await supabase
+      .from('coach_parts')
+      .select('status')
+      .eq('coach_id', coachId);
+    if (!allParts || allParts.length === 0) return;
+
+    // Compute which stages are completed based on all parts
+    const statuses = allParts.map((p) => p.status as PartStatus);
+    const completedStages: POHStage[] = [];
+    for (const [statusThreshold, stage] of Object.entries(PART_STATUS_TO_COMPLETED_STAGE) as [PartStatus, POHStage][]) {
+      const thresholdIdx = PART_STATUS_ORDER.indexOf(statusThreshold);
+      const allAtOrBeyond = statuses.every((s) => {
+        if (s === 'Missing/Pending') return false;
+        return PART_STATUS_ORDER.indexOf(s) >= thresholdIdx;
+      });
+      if (allAtOrBeyond) completedStages.push(stage);
+    }
+
+    if (completedStages.length === 0) return;
+
+    // Find the highest completed stage
+    let highestCompletedIdx = -1;
+    for (const stage of completedStages) {
+      const idx = POH_STAGE_ORDER.indexOf(stage);
+      if (idx > highestCompletedIdx) highestCompletedIdx = idx;
+    }
+
+    // Get current coach stage
+    const { data: coach } = await supabase
+      .from('coaches')
+      .select('current_stage, stage_start_date')
+      .eq('id', coachId)
+      .single();
+    if (!coach) return;
+
+    const currentStageIdx = POH_STAGE_ORDER.indexOf(coach.current_stage as POHStage);
+
+    // The coach should be at the stage AFTER the highest completed stage
+    const targetStageIdx = Math.min(highestCompletedIdx + 1, POH_STAGE_ORDER.length - 1);
+
+    if (targetStageIdx <= currentStageIdx) return; // Already at or beyond target
+
+    // Advance through each intermediate stage
+    const now = new Date().toISOString();
+    let stageStartDate = coach.stage_start_date;
+
+    for (let i = currentStageIdx; i < targetStageIdx; i++) {
+      const fromStage = POH_STAGE_ORDER[i];
+      const toStage = POH_STAGE_ORDER[i + 1];
+
+      // Calculate actual duration for the stage being completed
+      const startDate = new Date(stageStartDate);
+      const actualDays = Math.max(1, Math.ceil((Date.now() - startDate.getTime()) / 86_400_000));
+      const targetDays = TARGET_DURATIONS[fromStage];
+
+      let timelineStatus: string;
+      if (actualDays < targetDays) timelineStatus = 'Ahead of Schedule';
+      else if (actualDays <= targetDays) timelineStatus = 'On Schedule';
+      else if (actualDays <= targetDays + 2) timelineStatus = 'Minor Delay';
+      else timelineStatus = 'Significant Delay';
+
+      // Complete current stage history entry
+      await supabase
+        .from('coach_stage_history')
+        .update({
+          completion_date: now,
+          actual_duration_days: actualDays,
+          timeline_status: timelineStatus,
+        })
+        .eq('coach_id', coachId)
+        .eq('stage', fromStage)
+        .is('completion_date', null);
+
+      // Create new stage history entry for next stage
+      await supabase.from('coach_stage_history').insert({
+        coach_id: coachId,
+        stage: toStage,
+        start_date: now,
+        target_duration_days: TARGET_DURATIONS[toStage],
+      });
+
+      stageStartDate = now;
+    }
+
+    // Update coach record to the target stage
+    await supabase
+      .from('coaches')
+      .update({
+        current_stage: POH_STAGE_ORDER[targetStageIdx],
+        stage_start_date: now,
+      })
+      .eq('id', coachId);
+  } catch {
+    // Auto-advance failures should not break the part update
+  }
 }
 
 /* ── getMissingPartsReport ───────────────────────────────── */

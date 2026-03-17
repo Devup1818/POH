@@ -25,6 +25,7 @@ import {
   type RakeSummary,
 } from '@/lib/queries/dashboard';
 import { useDashboardRealtime } from '@/lib/supabase/realtime';
+import { DotsLoader } from '@/components/ui/dots-loader';
 
 /* ── page ────────────────────────────────────────────────── */
 
@@ -181,11 +182,11 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-gray-800">Dashboard</h1>
-        <p className="mt-0.5 text-xs text-gray-400 flex items-center gap-2">
-          Showing POH operations for {shedLabel}
+        <h1 className="text-xl font-semibold tracking-tight text-gray-900">Dashboard</h1>
+        <p className="mt-1 text-xs text-gray-400 flex items-center gap-2">
+          POH operations for {shedLabel}
           <span className="flex items-center gap-1 text-green-500">
             <span className={cn(
               'inline-block h-1.5 w-1.5 rounded-full bg-green-400',
@@ -202,8 +203,7 @@ export default function DashboardPage() {
 
       {loading ? (
         <div className="flex items-center justify-center py-16">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
-          <span className="ml-3 text-sm text-gray-400">Loading...</span>
+          <DotsLoader size="lg" color="blue" />
         </div>
       ) : (
         <RakeList rakes={rakeCards} />

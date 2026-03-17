@@ -15,7 +15,7 @@ export function Header({ onMenuClick, className }: HeaderProps) {
   return (
     <header
       className={cn(
-        'sticky top-0 z-30 flex h-16 items-center justify-between border-b border-gray-200 bg-white px-4 lg:px-6',
+        'sticky top-0 z-30 flex h-16 items-center justify-between bg-[#f8f6f2]/70 backdrop-blur-xl backdrop-saturate-150 px-4 lg:px-6',
         className,
       )}
     >

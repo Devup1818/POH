@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { getClientUser } from '@/lib/supabase/get-user-or-dev';
 import { fetchUsers } from '@/lib/actions/admin-users';
 import { UserListTable } from '@/components/admin/user-list-table';
 import type { UserRecord } from '@/types';
+import { DotsLoader } from '@/components/ui/dots-loader';
 
 export default function AdminUsersPage() {
   const router = useRouter();
@@ -16,14 +18,13 @@ export default function AdminUsersPage() {
 
   const loadData = async () => {
     try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/login'); return; }
+      const { supabase, userId } = await getClientUser();
+      if (!userId) { router.push('/login'); return; }
 
       const { data: profile } = await supabase
         .from('users')
         .select('role')
-        .eq('id', user.id)
+        .eq('id', userId)
         .single();
 
       if (profile?.role !== 'Admin') { router.push('/'); return; }
@@ -51,7 +52,7 @@ export default function AdminUsersPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+        <DotsLoader size="lg" color="blue" />
       </div>
     );
   }

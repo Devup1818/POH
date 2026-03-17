@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { ShieldAlert } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { isAuthEnabled, DEV_USER } from '@/lib/dev-auth';
 import type { UserRole } from '@/types';
 
 interface RoleGuardProps {
@@ -34,10 +35,16 @@ export function RoleGuard({
     async function fetchRole() {
       try {
         const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        let userId: string | null = null;
 
-        if (!user) {
-          // No auth session — default to Technician for dev
+        if (isAuthEnabled) {
+          const { data: { user } } = await supabase.auth.getUser();
+          userId = user?.id ?? null;
+        } else {
+          userId = DEV_USER.id;
+        }
+
+        if (!userId) {
           setRole('Technician');
           setLoading(false);
           return;
@@ -46,19 +53,18 @@ export function RoleGuard({
         const { data: profile } = await supabase
           .from('users')
           .select('role')
-          .eq('id', user.id)
+          .eq('id', userId)
           .single();
 
         if (profile?.role) {
           setRole(profile.role as UserRole);
+        } else if (!isAuthEnabled) {
+          setRole(DEV_USER.role);
         } else {
-          // Fallback to user metadata or default
-          const metaRole = user.user_metadata?.role as UserRole | undefined;
-          setRole(metaRole ?? 'Technician');
+          setRole('Technician');
         }
       } catch {
-        // DB not available — default to Technician for dev
-        setRole('Technician');
+        setRole(isAuthEnabled ? 'Technician' : DEV_USER.role);
       }
       setLoading(false);
     }

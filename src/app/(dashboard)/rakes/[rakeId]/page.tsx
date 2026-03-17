@@ -1,9 +1,7 @@
 'use client';
 
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { BarChart3 } from 'lucide-react';
 import { RakeHeader } from '@/components/rakes/rake-header';
 import { StageProgressChart } from '@/components/rakes/stage-progress-chart';
 import { CoachGrid, type CoachCardData } from '@/components/rakes/coach-grid';
@@ -15,7 +13,10 @@ import { POH_STAGE_ORDER, TARGET_DURATIONS } from '@/lib/constants';
 import { getRakeDetail, type RakeDetail } from '@/lib/queries/coach';
 import { updateCoachType } from '@/lib/actions/coach';
 import { createClient } from '@/lib/supabase/client';
+import { getClientUser } from '@/lib/supabase/get-user-or-dev';
 import { bulkAdvanceStage, bulkUpdatePartStatus, bulkAddNote, bulkUpdateChecklistItem, undoBulkOperation, type BulkResult, type BulkPreviousState } from '@/lib/actions/bulk';
+import { useRakeDetailRealtime } from '@/lib/supabase/realtime';
+import { DotsLoader } from '@/components/ui/dots-loader';
 
 export default function RakeDetailPage() {
   const params = useParams<{ rakeId: string }>();
@@ -37,14 +38,25 @@ export default function RakeDetailPage() {
   useEffect(() => {
     (async () => {
       try {
-        const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-        const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single();
+        const { supabase, userId } = await getClientUser();
+        if (!userId) return;
+        const { data: profile } = await supabase.from('users').select('role').eq('id', userId).single();
         setIsAdmin(profile?.role === 'Admin');
       } catch { /* ignore */ }
     })();
   }, []);
+
+  // Debounced refresh to avoid hammering the DB on rapid real-time events
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshRakeData = useCallback(() => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => {
+      getRakeDetail(rakeId).then((d) => { if (d) setRake(d); });
+    }, 500);
+  }, [rakeId]);
+
+  // Real-time subscription: auto-refresh when coaches/parts/stage_history change
+  useRakeDetailRealtime(rakeId, refreshRakeData);
 
   const handleCoachTypeChange = useCallback(async (coachId: string, newType: 'MC' | 'TC') => {
     const result = await updateCoachType(coachId, newType);
@@ -119,23 +131,22 @@ export default function RakeDetailPage() {
   const handleCloseModal = useCallback(() => { setShowConfirmModal(false); setConfirmAction(null); setSelectedCoachIds(new Set()); }, []);
   const selectedCoachData = useMemo(() => { if (!data) return []; return data.coachCards.filter((c) => selectedCoachIds.has(c.id)); }, [data, selectedCoachIds]);
 
-  if (loading) return <div className="flex h-64 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" /></div>;
+  if (loading) return (
+    <div className="flex items-center justify-center py-24">
+      <DotsLoader size="lg" color="blue" />
+    </div>
+  );
   if (!rake || !data) return <div className="flex h-64 items-center justify-center"><p className="text-sm text-gray-400">Rake not found.</p></div>;
 
   return (
-    <div className="space-y-5 pb-20">
+    <div className="space-y-5 pb-24">
       <RakeHeader rakeId={rakeId} rakeNumber={rake.rakeNumber} rakeCategory={(rake.rakeCategory ?? rake.rakeType ?? 'EMU') as any} rakeType={rake.rakeType as any} pohType={rake.pohType as any} shedId={rake.shedId} shedName={rake.shedName} intakeDate={rake.intakeDate} elapsedDays={data.elapsedDays} currentStage={data.rakeStage} totalCoaches={rake.totalCoaches} avgCompletionPercentage={data.avgCompletion} />
-      <div className="flex items-center gap-3">
-        <Link
-          href={`/rakes/${rakeId}/section-analysis`}
-          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-        >
-          <BarChart3 className="h-4 w-4" />
-          Section Analysis
-        </Link>
+
+      {/* Stats + Stage Distribution side by side */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-4 items-stretch">
+        <StageProgressChart coachStages={data.coachStages} totalCoaches={rake.totalCoaches} />
+        <AggregateStats avgCompletionPercentage={data.avgCompletion} totalMissingParts={data.totalMissingParts} avgDelayDays={data.avgDelay} coachesBlockingProgression={data.blockingCount} testingCompleteCount={data.testingCompleteCount} testingTotalCount={data.testingTotalCount} />
       </div>
-      <AggregateStats avgCompletionPercentage={data.avgCompletion} totalMissingParts={data.totalMissingParts} avgDelayDays={data.avgDelay} coachesBlockingProgression={data.blockingCount} testingCompleteCount={data.testingCompleteCount} testingTotalCount={data.testingTotalCount} />
-      <StageProgressChart coachStages={data.coachStages} totalCoaches={rake.totalCoaches} />
       <CoachGrid rakeId={rakeId} coaches={data.coachCards} selectedCoachIds={selectedCoachIds} onToggleSelect={handleToggleSelect} selectionEnabled={true} allowCoachTypeEdit={isAdmin} onCoachTypeChange={handleCoachTypeChange} />
       <BulkActionsBar selectedCount={selectedCoachIds.size} totalCoaches={rake.coaches.length} onAction={handleBulkAction} onSelectAllInStage={handleSelectAllInStage} onSelectAllDelayed={handleSelectAllDelayed} onClearSelection={handleClearSelection} />
       <BulkConfirmationModal open={showConfirmModal} onClose={handleCloseModal} onConfirm={handleBulkConfirm} onUndo={handleBulkUndo} action={confirmAction} selectedCoaches={selectedCoachData} />

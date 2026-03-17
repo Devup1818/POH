@@ -27,6 +27,7 @@ import {
 } from '@/lib/actions/sheds';
 import type { ShedRecord, ShedConfig } from '@/lib/actions/sheds';
 import { POH_STAGE_ORDER } from '@/lib/constants';
+import { DotsLoader } from '@/components/ui/dots-loader';
 
 export default function ShedManagementPage() {
   return (
@@ -67,7 +68,7 @@ function ShedManagementContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+        <DotsLoader size="lg" color="blue" />
       </div>
     );
   }

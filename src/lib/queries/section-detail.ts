@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { getEffectiveUser } from '@/lib/supabase/dev-session';
 import type { SectionDetailData, SectionWorkItem, MustChangeItemInstance, SectionTestInstance, M4CoordinationEntry, SectionCode } from '@/types';
 
 export async function getSectionDetail(coachId: string, sectionCode: string): Promise<SectionDetailData | null> {
@@ -54,7 +55,7 @@ export async function getSectionDetail(coachId: string, sectionCode: string): Pr
   const pohCycle = (coach as any)?.rakes?.poh_type ?? '1st POH';
 
   // Check if current user is assigned SSE for this section
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getEffectiveUser();
   let isEditable = false;
   if (user) {
     // Check if admin

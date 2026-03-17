@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
+import { isAuthEnabled, DEV_USER } from '@/lib/dev-auth';
 import type { UserRole } from '@/types';
 
 interface NavItem {
@@ -34,6 +35,15 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/settings', label: 'Settings', icon: Settings, roles: ['Admin'] },
 ];
 
+const NAV_ICON_COLORS: Record<string, string> = {
+  '/': 'text-blue-500',
+  '/rakes/new': 'text-emerald-500',
+  '/completed': 'text-green-500',
+  '/reports': 'text-violet-500',
+  '/admin/users': 'text-amber-500',
+  '/settings': 'text-gray-500',
+};
+
 interface SidebarProps {
   open: boolean;
   onClose: () => void;
@@ -47,19 +57,35 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     async function fetchRole() {
       try {
         const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
+        let userId: string | null = null;
+
+        if (isAuthEnabled) {
+          const { data: { user } } = await supabase.auth.getUser();
+          userId = user?.id ?? null;
+        } else {
+          userId = DEV_USER.id;
+        }
+
+        if (!userId) {
           setUserRole('Technician');
           return;
         }
+
         const { data: profile } = await supabase
           .from('users')
           .select('role')
-          .eq('id', user.id)
+          .eq('id', userId)
           .single();
-        setUserRole((profile?.role as UserRole) ?? (user.user_metadata?.role as UserRole) ?? 'Technician');
+
+        if (profile?.role) {
+          setUserRole(profile.role as UserRole);
+        } else if (!isAuthEnabled) {
+          setUserRole(DEV_USER.role);
+        } else {
+          setUserRole('Technician');
+        }
       } catch {
-        setUserRole('Technician');
+        setUserRole(isAuthEnabled ? 'Technician' : DEV_USER.role);
       }
     }
     fetchRole();
@@ -90,12 +116,12 @@ export function Sidebar({ open, onClose }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-gray-200 bg-white transition-transform duration-200 lg:static lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-gray-100/80 bg-[#faf8f5] transition-transform duration-200 lg:static lg:translate-x-0',
           open ? 'translate-x-0' : '-translate-x-full',
         )}
       >
         {/* Logo / Brand */}
-        <div className="flex h-16 items-center justify-between border-b border-gray-200 px-4">
+        <div className="flex h-16 items-center justify-between border-b border-gray-100/80 px-4">
           <Link href="/" className="flex items-center gap-2" onClick={onClose}>
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
               <Train className="h-5 w-5 text-white" />
@@ -133,7 +159,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 )}
                 aria-current={active ? 'page' : undefined}
               >
-                <Icon className={cn('h-5 w-5 flex-shrink-0', active ? 'text-blue-600' : 'text-gray-400')} />
+                <Icon className={cn('h-5 w-5 flex-shrink-0', active ? 'text-blue-600' : NAV_ICON_COLORS[item.href] ?? 'text-gray-400')} />
                 {item.label}
               </Link>
             );
@@ -141,7 +167,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         </nav>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 px-4 py-3">
+        <div className="border-t border-gray-100/80 px-4 py-3">
           <p className="text-xs text-gray-400">Railway POH System v1.0</p>
         </div>
       </aside>

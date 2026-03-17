@@ -209,6 +209,24 @@ export async function signOut() {
 }
 
 export async function getSession() {
+  if (process.env.NEXT_PUBLIC_AUTH_ENABLED === 'false') {
+    // Return a minimal mock session for dev bypass
+    return {
+      access_token: 'dev-bypass',
+      token_type: 'bearer',
+      expires_in: 999999,
+      refresh_token: '',
+      user: {
+        id: process.env.DEV_USER_ID || '00000000-0000-0000-0000-000000000000',
+        email: 'dev@localhost',
+        aud: 'authenticated',
+        role: 'authenticated',
+        app_metadata: {},
+        user_metadata: { role: 'Admin', full_name: 'Dev Admin' },
+        created_at: '',
+      },
+    } as any;
+  }
   const supabase = await createClient();
   const { data: { session }, error } = await supabase.auth.getSession();
 
@@ -220,6 +238,17 @@ export async function getSession() {
 }
 
 export async function getUser() {
+  if (process.env.NEXT_PUBLIC_AUTH_ENABLED === 'false') {
+    return {
+      id: process.env.DEV_USER_ID || '00000000-0000-0000-0000-000000000000',
+      email: 'dev@localhost',
+      aud: 'authenticated',
+      role: 'authenticated',
+      app_metadata: {},
+      user_metadata: { role: 'Admin', full_name: 'Dev Admin' },
+      created_at: '',
+    } as any;
+  }
   const supabase = await createClient();
   const { data: { user }, error } = await supabase.auth.getUser();
 

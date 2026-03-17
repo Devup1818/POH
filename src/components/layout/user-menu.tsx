@@ -6,6 +6,7 @@ import { LogOut, Shield, Building2, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { signOut } from '@/lib/supabase/auth';
 import { createClient } from '@/lib/supabase/client';
+import { isAuthEnabled, DEV_USER } from '@/lib/dev-auth';
 import type { User } from '@supabase/supabase-js';
 
 interface UserShed {
@@ -53,22 +54,29 @@ export function UserMenu({ className }: UserMenuProps) {
   useEffect(() => {
     async function fetchUser() {
       const supabase = createClient();
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) return;
-      setUser(authUser);
+      let userId: string | null = null;
+
+      if (isAuthEnabled) {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        if (!authUser) return;
+        setUser(authUser);
+        userId = authUser.id;
+      } else {
+        userId = DEV_USER.id;
+      }
 
       // Try to fetch user profile and shed assignments from database
       try {
         const { data: profile } = await supabase
           .from('users')
           .select('full_name, role')
-          .eq('id', authUser.id)
+          .eq('id', userId)
           .single();
 
         const { data: shedAssignments } = await supabase
           .from('user_shed_assignments')
           .select('is_primary, sheds:shed_id(id, name, shed_code)')
-          .eq('user_id', authUser.id);
+          .eq('user_id', userId);
 
         const sheds: UserShed[] = (shedAssignments ?? [])
           .filter((a) => a.sheds)
@@ -88,15 +96,29 @@ export function UserMenu({ className }: UserMenuProps) {
             role: profile.role,
             sheds,
           });
+        } else if (!isAuthEnabled) {
+          setUserProfile({
+            fullName: DEV_USER.full_name,
+            role: DEV_USER.role,
+            sheds: [],
+          });
         }
       } catch {
-        // If DB tables don't exist yet or RLS blocks, fall back to user metadata
-        const meta = authUser.user_metadata ?? {};
-        setUserProfile({
-          fullName: meta.full_name ?? authUser.email ?? 'User',
-          role: meta.role ?? 'Technician',
-          sheds: [],
-        });
+        // If DB tables don't exist yet or RLS blocks, fall back
+        if (!isAuthEnabled) {
+          setUserProfile({
+            fullName: DEV_USER.full_name,
+            role: DEV_USER.role,
+            sheds: [],
+          });
+        } else {
+          const meta = user?.user_metadata ?? {};
+          setUserProfile({
+            fullName: meta.full_name ?? user?.email ?? 'User',
+            role: meta.role ?? 'Technician',
+            sheds: [],
+          });
+        }
       }
     }
     fetchUser();

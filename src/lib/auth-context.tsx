@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import type { UserRole } from '@/types';
 
 export interface AppUser {
@@ -71,11 +71,13 @@ const SEED_USERS: AppUser[] = [
 
 const OTP_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
 
+const isAuthEnabled = process.env.NEXT_PUBLIC_AUTH_ENABLED !== 'false';
+
 let _nextUserId = 10;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [users, setUsers] = useState<AppUser[]>(SEED_USERS);
-  const [user, setUser] = useState<AppUser | null>(null);
+  const [user, setUser] = useState<AppUser | null>(!isAuthEnabled ? SEED_USERS[0] : null);
   // Store hashed OTPs with expiry: userId -> { hash, expiresAt }
   const otpStoreRef = useRef<Record<string, { hash: string; expiresAt: number }>>({});
 
