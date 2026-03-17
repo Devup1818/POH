@@ -2,6 +2,8 @@
 
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { BarChart3 } from 'lucide-react';
 import { RakeHeader } from '@/components/rakes/rake-header';
 import { StageProgressChart } from '@/components/rakes/stage-progress-chart';
 import { CoachGrid, type CoachCardData } from '@/components/rakes/coach-grid';
@@ -123,6 +125,15 @@ export default function RakeDetailPage() {
   return (
     <div className="space-y-5 pb-20">
       <RakeHeader rakeId={rakeId} rakeNumber={rake.rakeNumber} rakeCategory={(rake.rakeCategory ?? rake.rakeType ?? 'EMU') as any} rakeType={rake.rakeType as any} pohType={rake.pohType as any} shedId={rake.shedId} shedName={rake.shedName} intakeDate={rake.intakeDate} elapsedDays={data.elapsedDays} currentStage={data.rakeStage} totalCoaches={rake.totalCoaches} avgCompletionPercentage={data.avgCompletion} />
+      <div className="flex items-center gap-3">
+        <Link
+          href={`/rakes/${rakeId}/section-analysis`}
+          className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          <BarChart3 className="h-4 w-4" />
+          Section Analysis
+        </Link>
+      </div>
       <AggregateStats avgCompletionPercentage={data.avgCompletion} totalMissingParts={data.totalMissingParts} avgDelayDays={data.avgDelay} coachesBlockingProgression={data.blockingCount} testingCompleteCount={data.testingCompleteCount} testingTotalCount={data.testingTotalCount} />
       <StageProgressChart coachStages={data.coachStages} totalCoaches={rake.totalCoaches} />
       <CoachGrid rakeId={rakeId} coaches={data.coachCards} selectedCoachIds={selectedCoachIds} onToggleSelect={handleToggleSelect} selectionEnabled={true} allowCoachTypeEdit={isAdmin} onCoachTypeChange={handleCoachTypeChange} />

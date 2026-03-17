@@ -1,37 +1,29 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { AlertTriangle, Calendar } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Calendar, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Card, CardBody } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ProgressBar } from '@/components/ui/progress-bar';
-import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { formatDateIST } from '@/lib/utils/date';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { updatePartStatus } from '@/lib/actions/parts';
+import { getNextPartStatus } from '@/lib/constants';
 import type { MockPart } from '@/lib/mock-data';
 import type { PartStatus } from '@/types';
 
 export interface PartsTrackerProps {
   parts: MockPart[];
+  onPartsChange?: (parts: MockPart[]) => void;
 }
-
-const PART_STATUS_OPTIONS: { value: PartStatus; label: string }[] = [
-  { value: 'Not Started', label: 'Not Started' },
-  { value: 'Dismantled', label: 'Dismantled' },
-  { value: 'Under Inspection', label: 'Under Inspection' },
-  { value: 'Overhauled/Repaired', label: 'Overhauled/Repaired' },
-  { value: 'Reassembled', label: 'Reassembled' },
-  { value: 'Tested', label: 'Tested' },
-  { value: 'Missing/Pending', label: 'Missing/Pending' },
-];
 
 const statusVariant: Record<PartStatus, 'default' | 'success' | 'warning' | 'danger' | 'info' | 'blue' | 'purple' | 'gray'> = {
   'Not Started': 'gray',
+  'Intake': 'gray',
   'Dismantled': 'info',
   'Under Inspection': 'blue',
   'Overhauled/Repaired': 'purple',
@@ -40,10 +32,7 @@ const statusVariant: Record<PartStatus, 'default' | 'success' | 'warning' | 'dan
   'Missing/Pending': 'danger',
 };
 
-
-
-export function PartsTracker({ parts }: PartsTrackerProps) {
-  const [localParts, setLocalParts] = useState(parts);
+export function PartsTracker({ parts, onPartsChange }: PartsTrackerProps) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -52,36 +41,28 @@ export function PartsTracker({ parts }: PartsTrackerProps) {
   const [missingNotes, setMissingNotes] = useState('');
   const [missingDate, setMissingDate] = useState('');
 
-  const total = localParts.length;
-  const completed = localParts.filter(
+  const total = parts.length;
+  const completed = parts.filter(
     (p) => p.status === 'Tested' || p.status === 'Reassembled',
   ).length;
   const completionPct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-  const handleStatusChange = (partId: string, newStatus: string) => {
-    if (newStatus === 'Missing/Pending') {
-      const part = localParts.find((p) => p.id === partId);
-      setMissingModal({ partId, partName: part?.partName ?? '' });
-      setMissingNotes('');
-      setMissingDate('');
-      return;
-    }
-
-    // Optimistic update
-    setLocalParts((prev) =>
-      prev.map((p) =>
-        p.id === partId
-          ? { ...p, status: newStatus as PartStatus, statusUpdatedAt: new Date().toISOString() }
-          : p,
-      ),
+  const handleStatusChange = (partId: string, newStatus: PartStatus) => {
+    // Optimistic update — mutate via parent callback
+    const updatedParts = parts.map((p) =>
+      p.id === partId
+        ? { ...p, status: newStatus, statusUpdatedAt: new Date().toISOString() }
+        : p,
     );
+    onPartsChange?.(updatedParts);
     setError(null);
 
     startTransition(async () => {
-      const result = await updatePartStatus(partId, newStatus as PartStatus);
+      const result = await updatePartStatus(partId, newStatus);
       if (!result.success) {
         setError(result.error);
-        setLocalParts(parts); // revert
+        // Revert to original parts from prop
+        onPartsChange?.(parts);
       }
     });
   };
@@ -90,19 +71,18 @@ export function PartsTracker({ parts }: PartsTrackerProps) {
     if (!missingModal) return;
     const { partId } = missingModal;
 
-    setLocalParts((prev) =>
-      prev.map((p) =>
-        p.id === partId
-          ? {
-              ...p,
-              status: 'Missing/Pending' as PartStatus,
-              notes: missingNotes,
-              expectedArrivalDate: missingDate,
-              statusUpdatedAt: new Date().toISOString(),
-            }
-          : p,
-      ),
+    const updatedParts = parts.map((p) =>
+      p.id === partId
+        ? {
+            ...p,
+            status: 'Missing/Pending' as PartStatus,
+            notes: missingNotes,
+            expectedArrivalDate: missingDate,
+            statusUpdatedAt: new Date().toISOString(),
+          }
+        : p,
     );
+    onPartsChange?.(updatedParts);
     setMissingModal(null);
     setError(null);
 
@@ -110,7 +90,7 @@ export function PartsTracker({ parts }: PartsTrackerProps) {
       const result = await updatePartStatus(partId, 'Missing/Pending', missingNotes, missingDate);
       if (!result.success) {
         setError(result.error);
-        setLocalParts(parts);
+        onPartsChange?.(parts);
       }
     });
   };
@@ -134,26 +114,24 @@ export function PartsTracker({ parts }: PartsTrackerProps) {
       </Card>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {localParts.map((part) => {
+        {parts.map((part) => {
           const isMissing = part.status === 'Missing/Pending';
+          const isFinal = part.status === 'Tested';
+          const nextStatus = isMissing ? null : getNextPartStatus(part.status);
+
           return (
             <Card key={part.id} className={cn(isMissing && 'border-red-300 bg-red-50/30')}>
               <CardBody className="py-3 px-3 space-y-2">
                 <div className="flex items-start justify-between gap-2">
                   <h4 className="text-sm font-semibold text-gray-900">{part.partName}</h4>
                   {isMissing && <AlertTriangle className="h-4 w-4 text-red-500 flex-shrink-0" />}
+                  {isFinal && <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />}
                 </div>
+
                 <Badge variant={statusVariant[part.status]} size="sm">{part.status}</Badge>
-                <Select
-                  options={PART_STATUS_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-                  value={part.status}
-                  onChange={(e) => handleStatusChange(part.id, e.target.value)}
-                  className="text-xs"
-                  disabled={isPending}
-                />
-                <p className="text-xs text-gray-400">Updated: {formatDateIST(part.statusUpdatedAt)}</p>
+
                 {isMissing && (
-                  <div className="space-y-2 rounded-md border border-red-200 bg-red-50 p-2">
+                  <div className="space-y-1 rounded-md border border-red-200 bg-red-50 p-2">
                     <p className="text-xs text-red-700">{part.notes || 'No notes'}</p>
                     <div className="flex items-center gap-1.5 text-xs text-red-600">
                       <Calendar className="h-3.5 w-3.5" />
@@ -161,13 +139,55 @@ export function PartsTracker({ parts }: PartsTrackerProps) {
                     </div>
                   </div>
                 )}
+
+                <p className="text-xs text-gray-400">Updated: {formatDateIST(part.statusUpdatedAt)}</p>
+
+                <div className="flex items-center gap-2 pt-1">
+                  {nextStatus && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="flex-1 flex items-center justify-center gap-1.5 text-xs"
+                      disabled={isPending}
+                      onClick={() => handleStatusChange(part.id, nextStatus)}
+                    >
+                      <ArrowRight className="h-3.5 w-3.5" />
+                      {nextStatus}
+                    </Button>
+                  )}
+
+                  {!isMissing && !isFinal && (
+                    <button
+                      className="text-xs text-red-500 hover:text-red-700 underline underline-offset-2 disabled:opacity-50"
+                      disabled={isPending}
+                      onClick={() => {
+                        setMissingModal({ partId: part.id, partName: part.partName });
+                        setMissingNotes('');
+                        setMissingDate('');
+                      }}
+                    >
+                      Missing?
+                    </button>
+                  )}
+
+                  {isMissing && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="flex-1 text-xs"
+                      disabled={isPending}
+                      onClick={() => handleStatusChange(part.id, 'Not Started')}
+                    >
+                      Re-enter flow
+                    </Button>
+                  )}
+                </div>
               </CardBody>
             </Card>
           );
         })}
       </div>
 
-      {/* Missing/Pending modal */}
       {missingModal && (
         <Modal
           title={`Mark ${missingModal.partName} as Missing/Pending`}

@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import type { PartStatus, Result } from '@/types';
+import { PART_STATUS_ORDER } from '@/lib/constants';
 
 /* ── Types ───────────────────────────────────────────────── */
 
@@ -51,6 +52,36 @@ export async function updatePartStatus(
   }
 
   const supabase = await createClient();
+
+  // Fetch current status for sequential validation
+  const { data: currentPart, error: fetchErr } = await supabase
+    .from('coach_parts')
+    .select('status')
+    .eq('id', partId)
+    .single();
+
+  if (fetchErr || !currentPart) {
+    return { success: false, error: 'Part not found' };
+  }
+
+  const currentStatus = currentPart.status as PartStatus;
+
+  // Allow returning from Missing/Pending to Not Started
+  if (currentStatus === 'Missing/Pending' && status === 'Not Started') {
+    // valid — re-entering the flow
+  } else if (status !== 'Missing/Pending') {
+    // Validate sequential progression
+    const currentIdx = PART_STATUS_ORDER.indexOf(currentStatus);
+    const newIdx = PART_STATUS_ORDER.indexOf(status);
+
+    if (currentStatus === 'Missing/Pending') {
+      return { success: false, error: 'Part is Missing/Pending. Set it back to Not Started first.' };
+    }
+
+    if (newIdx !== currentIdx + 1 && newIdx !== currentIdx) {
+      return { success: false, error: `Cannot skip stages. Current: ${currentStatus}, next valid: ${PART_STATUS_ORDER[currentIdx + 1] ?? 'none'}` };
+    }
+  }
 
   const { error } = await supabase
     .from('coach_parts')

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import { cn } from '@/lib/utils';
 import {
   Train,
   Users,
@@ -50,8 +51,10 @@ export default function DashboardPage() {
 
   const [rakes, setRakes] = useState<RakeSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  // Separate flag so realtime refreshes don't flash the loading spinner
+  const [silentRefreshing, setSilentRefreshing] = useState(false);
 
-  // Fetch data when shed or filters change
+  // Full fetch (shows spinner on first load / filter change)
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -76,12 +79,38 @@ export default function DashboardPage() {
     }
   }, [selectedShedId, filters]);
 
+  // Silent refresh — used by realtime so cards update without a loading flash
+  const silentFetch = useCallback(async () => {
+    if (silentRefreshing) return; // debounce concurrent triggers
+    setSilentRefreshing(true);
+    try {
+      const [metricsData, rakesData] = await Promise.all([
+        getDashboardMetrics(selectedShedId),
+        getActiveRakes({
+          shedId: selectedShedId,
+          rakeType: filters.rakeType,
+          pohType: filters.pohType,
+          stage: filters.stage,
+          timelineStatus: filters.timelineStatus,
+          sortBy: filters.sortBy,
+          search: filters.search,
+        }),
+      ]);
+      setMetrics(metricsData);
+      setRakes(rakesData);
+    } catch (err) {
+      console.error('Realtime refresh failed:', err);
+    } finally {
+      setSilentRefreshing(false);
+    }
+  }, [selectedShedId, filters, silentRefreshing]);
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Real-time: refresh data when rakes/coaches/parts change
-  useDashboardRealtime(selectedShedId, fetchData);
+  // Real-time: silently refresh when rakes/coaches/parts change
+  useDashboardRealtime(selectedShedId, silentFetch);
 
   // Map RakeSummary to RakeCardData
   const rakeCards: RakeCardData[] = useMemo(
@@ -155,8 +184,15 @@ export default function DashboardPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-xl font-semibold text-gray-800">Dashboard</h1>
-        <p className="mt-0.5 text-xs text-gray-400">
+        <p className="mt-0.5 text-xs text-gray-400 flex items-center gap-2">
           Showing POH operations for {shedLabel}
+          <span className="flex items-center gap-1 text-green-500">
+            <span className={cn(
+              'inline-block h-1.5 w-1.5 rounded-full bg-green-400',
+              silentRefreshing && 'animate-ping',
+            )} />
+            {silentRefreshing ? 'Updating...' : 'Live'}
+          </span>
         </p>
       </div>
 

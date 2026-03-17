@@ -405,10 +405,11 @@ export const MOCK_COACHES: MockCoach[] = generateCoaches();
 function generateParts(): MockPart[] {
   const parts: MockPart[] = [];
   const stageToPartStatus: Record<POHStage, PartStatus[]> = {
-    Intake: ['Not Started'],
-    Dismantling: ['Not Started', 'Dismantled'],
+    Intake: ['Not Started', 'Intake'],
+    Dismantling: ['Intake', 'Dismantled'],
     Inspection: ['Dismantled', 'Under Inspection'],
-    Reassembly: ['Under Inspection', 'Overhauled/Repaired', 'Reassembled'],
+    Overhaul: ['Under Inspection', 'Overhauled/Repaired'],
+    Reassembly: ['Overhauled/Repaired', 'Reassembled'],
     Finishing: ['Reassembled', 'Overhauled/Repaired'],
     Testing: ['Reassembled', 'Tested'],
     Trial: ['Tested', 'Reassembled'],

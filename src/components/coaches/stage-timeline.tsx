@@ -20,6 +20,8 @@ export interface StageHistoryEntry {
 export interface StageTimelineProps {
   stageHistory: StageHistoryEntry[];
   currentStage: POHStage;
+  /** Stages auto-completed based on all parts reaching the required status */
+  autoCompletedStages?: POHStage[];
 }
 
 
@@ -38,18 +40,25 @@ const statusBorderMap: Record<TimelineStatus, string> = {
   'Significant Delay': 'border-red-500',
 };
 
-export function StageTimeline({ stageHistory, currentStage }: StageTimelineProps) {
+export function StageTimeline({ stageHistory, currentStage, autoCompletedStages = [] }: StageTimelineProps) {
   return (
     <Card>
       <CardHeader>
         <h3 className="text-sm font-semibold text-gray-900">Stage Timeline</h3>
+        {autoCompletedStages.length > 0 && (
+          <p className="text-xs text-green-600 mt-1">
+            Auto-completed from parts: {autoCompletedStages.join(', ')}
+          </p>
+        )}
       </CardHeader>
       <CardBody className="px-4 py-3">
         <div className="space-y-0">
           {stageHistory.map((entry, idx) => {
             const isCompleted = entry.completionDate !== null;
-            const isCurrent = entry.stage === currentStage && !isCompleted;
-            const isNotStarted = !isCompleted && !isCurrent;
+            const isAutoCompleted = autoCompletedStages.includes(entry.stage);
+            const hasStarted = !!entry.startDate;
+            const isCurrent = entry.stage === currentStage && !isCompleted && hasStarted;
+            const isNotStarted = !isCompleted && !isCurrent && !isAutoCompleted;
 
             const elapsedDays = isCurrent
               ? calculateElapsedTime(entry.startDate).days
@@ -75,7 +84,9 @@ export function StageTimeline({ stageHistory, currentStage }: StageTimelineProps
                       'absolute left-[11px] top-6 w-0.5 h-[calc(100%-12px)]',
                       isCompleted
                         ? (entry.timelineStatus ? statusColorMap[entry.timelineStatus] : 'bg-green-500')
-                        : 'bg-gray-200',
+                        : isAutoCompleted
+                          ? 'bg-green-500'
+                          : 'bg-gray-200',
                     )}
                   />
                 )}
@@ -93,6 +104,8 @@ export function StageTimeline({ stageHistory, currentStage }: StageTimelineProps
                             : 'text-green-500',
                       )}
                     />
+                  ) : isAutoCompleted ? (
+                    <CheckCircle2 className="h-6 w-6 text-green-500" />
                   ) : isCurrent ? (
                     <Loader2 className="h-6 w-6 text-blue-500 animate-spin" />
                   ) : (
@@ -108,14 +121,16 @@ export function StageTimeline({ stageHistory, currentStage }: StageTimelineProps
                       ? 'border-blue-300 bg-blue-50'
                       : isCompleted
                         ? `border-gray-200 bg-white ${entry.timelineStatus ? statusBorderMap[entry.timelineStatus] : ''} border-l-2`
-                        : 'border-gray-100 bg-gray-50',
+                        : isAutoCompleted
+                          ? 'border-green-300 bg-green-50 border-l-2'
+                          : 'border-gray-100 bg-gray-50',
                   )}
                 >
                   <div className="flex items-center justify-between">
                     <span
                       className={cn(
                         'text-sm font-semibold',
-                        isCurrent ? 'text-blue-700' : isCompleted ? 'text-gray-900' : 'text-gray-400',
+                        isCurrent ? 'text-blue-700' : isCompleted ? 'text-gray-900' : isAutoCompleted ? 'text-green-700' : 'text-gray-400',
                       )}
                     >
                       {entry.stage}
@@ -132,6 +147,11 @@ export function StageTimeline({ stageHistory, currentStage }: StageTimelineProps
                         )}
                       >
                         {entry.timelineStatus}
+                      </span>
+                    )}
+                    {isAutoCompleted && !isCompleted && (
+                      <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
+                        Done (parts complete)
                       </span>
                     )}
                     {isCurrent && (

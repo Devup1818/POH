@@ -3,6 +3,7 @@ export type POHStage =
   | 'Intake'
   | 'Dismantling'
   | 'Inspection'
+  | 'Overhaul'
   | 'Reassembly'
   | 'Finishing'
   | 'Testing'
@@ -31,6 +32,7 @@ export type TimelineStatus =
 
 export type PartStatus =
   | 'Not Started'
+  | 'Intake'
   | 'Dismantled'
   | 'Under Inspection'
   | 'Overhauled/Repaired'

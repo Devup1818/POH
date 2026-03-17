@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect, useTransition } from 'react';
+import { useMemo, useState, useEffect, useTransition, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { LayoutGrid } from 'lucide-react';
@@ -14,7 +14,7 @@ import { TestingPanel } from '@/components/coaches/testing-panel';
 import { NotesPanel } from '@/components/coaches/notes-panel';
 import { Button } from '@/components/ui/button';
 import { ConfirmModal } from '@/components/ui/modal';
-import { POH_STAGE_ORDER, TARGET_DURATIONS } from '@/lib/constants';
+import { POH_STAGE_ORDER, TARGET_DURATIONS, getCompletedStagesFromParts } from '@/lib/constants';
 import { advanceCoachStage } from '@/lib/actions/coach';
 import { calculateTimelineStatus, calculateElapsedTime } from '@/lib/utils/timeline';
 import {
@@ -26,7 +26,10 @@ import {
   type ChecklistItemDetail,
   type NoteDetail,
 } from '@/lib/queries/coach';
+import { useCoachPartsRealtime } from '@/lib/supabase/realtime';
 import type { TimelineStatus } from '@/types';
+import type { MockPart } from '@/lib/mock-data';
+import type { PartStatus } from '@/types';
 
 export default function CoachDetailPage() {
   const params = useParams<{ rakeId: string; coachId: string }>();
@@ -50,6 +53,37 @@ export default function CoachDetailPage() {
   const [advanceError, setAdvanceError] = useState<string | null>(null);
   const [isAdvancing, startAdvanceTransition] = useTransition();
 
+  // Track current parts state for auto-stage-completion
+  const [currentParts, setCurrentParts] = useState<MockPart[]>([]);
+
+  const handlePartsChange = useCallback((updatedParts: MockPart[]) => {
+    setCurrentParts(updatedParts);
+  }, []);
+
+  // Real-time: merge incoming part updates from other users
+  useCoachPartsRealtime(coachId, useCallback((row) => {
+    setCurrentParts((prev) =>
+      prev.map((p) =>
+        p.id === row.id
+          ? {
+              ...p,
+              status: row.status as PartStatus,
+              notes: row.notes,
+              expectedArrivalDate: row.expected_arrival_date,
+              statusUpdatedAt: row.status_updated_at,
+            }
+          : p,
+      ),
+    );
+  }, []));
+
+  // Compute which overview stages are auto-completed based on parts
+  const autoCompletedStages = useMemo(() => {
+    if (currentParts.length === 0) return [];
+    const statuses = currentParts.map((p) => p.status as PartStatus);
+    return getCompletedStagesFromParts(statuses);
+  }, [currentParts]);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -62,6 +96,17 @@ export default function CoachDetailPage() {
     ]).then(([coachData, clItems, noteData, siblingData]) => {
       if (!cancelled) {
         setCoach(coachData);
+        if (coachData?.parts) {
+          setCurrentParts(coachData.parts.map((p) => ({
+            id: p.id,
+            coachId: coachData.id,
+            partName: p.partName as any,
+            status: p.status as any,
+            statusUpdatedAt: p.statusUpdatedAt,
+            notes: p.notes,
+            expectedArrivalDate: p.expectedArrivalDate,
+          })));
+        }
         setChecklistItems(clItems);
         setNotes(noteData);
         setSiblings(siblingData);
@@ -88,6 +133,17 @@ export default function CoachDetailPage() {
           getCoachSiblings(rakeId, coachId),
         ]);
         setCoach(coachData);
+        if (coachData?.parts) {
+          setCurrentParts(coachData.parts.map((p) => ({
+            id: p.id,
+            coachId: coachData.id,
+            partName: p.partName as any,
+            status: p.status as any,
+            statusUpdatedAt: p.statusUpdatedAt,
+            notes: p.notes,
+            expectedArrivalDate: p.expectedArrivalDate,
+          })));
+        }
         setChecklistItems(clItems);
         setNotes(noteData);
         setSiblings(siblingData);
@@ -193,16 +249,8 @@ export default function CoachDetailPage() {
     };
   });
 
-  // Map parts to MockPart shape for PartsTracker
-  const partsForTracker = coach.parts.map((p) => ({
-    id: p.id,
-    coachId: coach.id,
-    partName: p.partName as any,
-    status: p.status as any,
-    statusUpdatedAt: p.statusUpdatedAt,
-    notes: p.notes,
-    expectedArrivalDate: p.expectedArrivalDate,
-  }));
+  // Map parts to MockPart shape for PartsTracker — use currentParts (live state) not coach.parts (stale snapshot)
+  // This ensures tab switches don't reset part statuses
 
   // Map checklist items for ChecklistManager
   const checklistForManager = checklistItems.map((item) => ({
@@ -324,11 +372,17 @@ export default function CoachDetailPage() {
               currentStage={coach.currentStage}
               elapsedDays={derived.elapsedDaysInStage}
             />
-            <StageTimeline stageHistory={stageTimelineData} currentStage={coach.currentStage} />
+            <StageTimeline
+              stageHistory={stageTimelineData}
+              currentStage={coach.currentStage}
+              autoCompletedStages={autoCompletedStages}
+            />
           </div>
         )}
 
-        {activeTab === 'parts' && <PartsTracker parts={partsForTracker} />}
+        {activeTab === 'parts' && (
+          <PartsTracker parts={currentParts} onPartsChange={handlePartsChange} />
+        )}
 
         {activeTab === 'checklist' && (
           <ChecklistManager items={checklistForManager} coachId={coachId} />
