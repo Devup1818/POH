@@ -276,6 +276,103 @@ export async function getUser() {
   return user;
 }
 
+export async function forgotPassword(
+  email: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient();
+
+    // Resolve username to email if needed
+    let resolvedEmail = email;
+    if (!email.includes('@')) {
+      const { data: user } = await supabase
+        .from('users')
+        .select('email')
+        .eq('username', email)
+        .maybeSingle();
+      if (!user) {
+        return { success: true }; // Don't reveal whether email exists
+      }
+      resolvedEmail = user.email;
+    }
+
+    const origin = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    const { error } = await supabase.auth.resetPasswordForEmail(resolvedEmail, {
+      redirectTo: `${origin}/login/reset-password`,
+    });
+
+    if (error) {
+      const lower = error.message.toLowerCase();
+      if (lower.includes('too many requests') || lower.includes('rate limit')) {
+        return { success: false, error: 'Too many requests. Please wait a moment and try again.' };
+      }
+      return { success: false, error: 'Failed to send reset email. Please try again.' };
+    }
+
+    return { success: true };
+  } catch {
+    return { success: false, error: 'An error occurred. Please try again.' };
+  }
+}
+
+export async function resetPassword(
+  password: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.updateUser({ password });
+
+    if (error) {
+      const lower = error.message.toLowerCase();
+      if (lower.includes('same password')) {
+        return { success: false, error: 'New password must be different from current password.' };
+      }
+      return { success: false, error: 'Failed to reset password. Please try again.' };
+    }
+
+    return { success: true };
+  } catch {
+    return { success: false, error: 'An error occurred. Please try again.' };
+  }
+}
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient();
+
+    // Verify current password by trying to sign in
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.email) return { success: false, error: 'Not authenticated' };
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: currentPassword,
+    });
+
+    if (signInError) {
+      return { success: false, error: 'Current password is incorrect.' };
+    }
+
+    // Update to new password
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+
+    if (updateError) {
+      const lower = updateError.message.toLowerCase();
+      if (lower.includes('same password')) {
+        return { success: false, error: 'New password must be different from current password.' };
+      }
+      return { success: false, error: 'Failed to change password. Please try again.' };
+    }
+
+    return { success: true };
+  } catch {
+    return { success: false, error: 'An error occurred. Please try again.' };
+  }
+}
+
 function getUserFriendlyError(message: string): string {
   const lower = message.toLowerCase();
 

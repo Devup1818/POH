@@ -2,7 +2,7 @@ import { updateSession } from '@/lib/supabase/middleware';
 import { NextResponse, type NextRequest } from 'next/server';
 
 // Routes that don't require authentication
-const PUBLIC_ROUTES = ['/login'];
+const PUBLIC_ROUTES = ['/login', '/forgot-password', '/reset-password'];
 
 // The OTP verification page — requires poh_2fa_pending cookie but no active session
 const OTP_VERIFY_ROUTE = '/login/verify-otp';

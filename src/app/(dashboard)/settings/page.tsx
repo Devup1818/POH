@@ -1,6 +1,6 @@
 'use client';
 
-import { Settings, Building2, Users, Wrench } from 'lucide-react';
+import { Settings, Building2, Users, Wrench, KeyRound } from 'lucide-react';
 import Link from 'next/link';
 import { RoleGuard } from '@/components/auth/role-guard';
 
@@ -22,6 +22,12 @@ const SETTINGS_SECTIONS = [
     label: 'System Configuration',
     description: 'Target durations, delay thresholds, and notification preferences',
     icon: Wrench,
+  },
+  {
+    href: '/settings/change-password',
+    label: 'Change Password',
+    description: 'Update your account password',
+    icon: KeyRound,
   },
 ];
 

@@ -126,6 +126,14 @@ function LoginForm() {
             autoComplete="current-password"
             disabled={isPending}
           />
+          <div className="mt-1 text-right">
+            <a
+              href="/forgot-password"
+              className="text-xs text-amber-300/70 hover:text-amber-200 transition-colors"
+            >
+              Forgot Password?
+            </a>
+          </div>
         </div>
 
         {error && (
