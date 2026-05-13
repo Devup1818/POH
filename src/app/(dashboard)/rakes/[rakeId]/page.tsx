@@ -13,7 +13,7 @@ import { BulkConfirmationModal, type BulkActionParams } from '@/components/rakes
 import type { POHStage } from '@/types';
 import { POH_STAGE_ORDER, TARGET_DURATIONS } from '@/lib/constants';
 import { getRakeDetail, type RakeDetail } from '@/lib/queries/coach';
-import { updateCoachType } from '@/lib/actions/coach';
+import { advanceCoachStage, updateCoachType } from '@/lib/actions/coach';
 import { createClient } from '@/lib/supabase/client';
 import { bulkAdvanceStage, bulkUpdatePartStatus, bulkAddNote, bulkUpdateChecklistItem, undoBulkOperation, type BulkResult, type BulkPreviousState } from '@/lib/actions/bulk';
 
@@ -116,6 +116,14 @@ export default function RakeDetailPage() {
     return null;
   }, [selectedCoachIds, rakeId]);
   const handleBulkUndo = useCallback(async (prev: BulkPreviousState) => { await undoBulkOperation(prev); const d = await getRakeDetail(rakeId); if (d) setRake(d); }, [rakeId]);
+  const handleAdvanceCoachStage = useCallback(async (coachId: string) => {
+    const result = await advanceCoachStage(coachId);
+    if (result.success) {
+      const d = await getRakeDetail(rakeId);
+      if (d) setRake(d);
+    }
+  }, [rakeId]);
+
   const handleCloseModal = useCallback(() => { setShowConfirmModal(false); setConfirmAction(null); setSelectedCoachIds(new Set()); }, []);
   const selectedCoachData = useMemo(() => { if (!data) return []; return data.coachCards.filter((c) => selectedCoachIds.has(c.id)); }, [data, selectedCoachIds]);
 
@@ -136,7 +144,7 @@ export default function RakeDetailPage() {
       </div>
       <AggregateStats avgCompletionPercentage={data.avgCompletion} totalMissingParts={data.totalMissingParts} avgDelayDays={data.avgDelay} coachesBlockingProgression={data.blockingCount} testingCompleteCount={data.testingCompleteCount} testingTotalCount={data.testingTotalCount} />
       <StageProgressChart coachStages={data.coachStages} totalCoaches={rake.totalCoaches} />
-      <CoachGrid rakeId={rakeId} coaches={data.coachCards} selectedCoachIds={selectedCoachIds} onToggleSelect={handleToggleSelect} selectionEnabled={true} allowCoachTypeEdit={isAdmin} onCoachTypeChange={handleCoachTypeChange} />
+      <CoachGrid rakeId={rakeId} coaches={data.coachCards} selectedCoachIds={selectedCoachIds} onToggleSelect={handleToggleSelect} selectionEnabled={true} allowCoachTypeEdit={isAdmin} onCoachTypeChange={handleCoachTypeChange} onAdvanceStage={isAdmin ? handleAdvanceCoachStage : undefined} />
       <BulkActionsBar selectedCount={selectedCoachIds.size} totalCoaches={rake.coaches.length} onAction={handleBulkAction} onSelectAllInStage={handleSelectAllInStage} onSelectAllDelayed={handleSelectAllDelayed} onClearSelection={handleClearSelection} />
       <BulkConfirmationModal open={showConfirmModal} onClose={handleCloseModal} onConfirm={handleBulkConfirm} onUndo={handleBulkUndo} action={confirmAction} selectedCoaches={selectedCoachData} />
     </div>

@@ -96,25 +96,27 @@ export async function bulkAdvanceStage(
       }
     }
 
-    // Validate mandatory checklist items
-    const { data: incompleteItems } = await supabase
-      .from('coach_checklist_items')
-      .select('id, template:template_id(is_mandatory)')
-      .eq('coach_id', coachId)
-      .neq('status', 'Completed');
+    // Mandatory checklist validation only applies from Finishing stage onwards
+    if (POH_STAGE_ORDER.indexOf(currentStage) >= POH_STAGE_ORDER.indexOf('Finishing')) {
+      const { data: incompleteItems } = await supabase
+        .from('coach_checklist_items')
+        .select('id, template:template_id(is_mandatory)')
+        .eq('coach_id', coachId)
+        .neq('status', 'Completed');
 
-    if (incompleteItems) {
-      const incompleteMandatory = incompleteItems.filter((item) => {
-        const template = item.template as unknown as { is_mandatory: boolean } | null;
-        return template?.is_mandatory === true;
-      });
-      if (incompleteMandatory.length > 0) {
-        failed.push({
-          coachId,
-          coachNumber: coach.coach_number,
-          reason: `${incompleteMandatory.length} mandatory checklist item(s) incomplete`,
+      if (incompleteItems) {
+        const incompleteMandatory = incompleteItems.filter((item) => {
+          const template = item.template as unknown as { is_mandatory: boolean } | null;
+          return template?.is_mandatory === true;
         });
-        continue;
+        if (incompleteMandatory.length > 0) {
+          failed.push({
+            coachId,
+            coachNumber: coach.coach_number,
+            reason: `${incompleteMandatory.length} mandatory checklist item(s) incomplete`,
+          });
+          continue;
+        }
       }
     }
 

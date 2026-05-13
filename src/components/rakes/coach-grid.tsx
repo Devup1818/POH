@@ -7,6 +7,7 @@ import { WarningIndicator } from '@/components/ui/warning-indicator';
 import { Tooltip } from '@/components/ui/tooltip';
 import { MessageSquare } from 'lucide-react';
 import { getDelayDuration, getTimelineStatusColor } from '@/lib/utils/timeline';
+import { POH_STAGE_ORDER } from '@/lib/constants';
 import type { POHStage, TimelineStatus } from '@/types';
 
 export interface CoachCardData {
@@ -33,6 +34,8 @@ export interface CoachGridProps {
   /** If true, Admin can click coach type badge to toggle MC/TC */
   allowCoachTypeEdit?: boolean;
   onCoachTypeChange?: (coachId: string, newType: 'MC' | 'TC') => void;
+  /** Admin-only: quick-advance a coach without navigating to its detail page */
+  onAdvanceStage?: (coachId: string) => void;
 }
 
 const BORDER_COLORS: Record<TimelineStatus, string> = {
@@ -62,6 +65,7 @@ export function CoachGrid({
   selectionEnabled = false,
   allowCoachTypeEdit = false,
   onCoachTypeChange,
+  onAdvanceStage,
 }: CoachGridProps) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -79,6 +83,7 @@ export function CoachGrid({
             selectionEnabled={selectionEnabled}
             allowCoachTypeEdit={allowCoachTypeEdit}
             onCoachTypeChange={onCoachTypeChange}
+            onAdvanceStage={onAdvanceStage}
           />
         ))}
       </div>
@@ -94,6 +99,7 @@ function CoachCard({
   selectionEnabled,
   allowCoachTypeEdit,
   onCoachTypeChange,
+  onAdvanceStage,
 }: {
   rakeId: string;
   coach: CoachCardData;
@@ -102,6 +108,7 @@ function CoachCard({
   selectionEnabled: boolean;
   allowCoachTypeEdit?: boolean;
   onCoachTypeChange?: (coachId: string, newType: 'MC' | 'TC') => void;
+  onAdvanceStage?: (coachId: string) => void;
 }) {
   const hasMissing = coach.missingPartsCount > 0;
   const delayDays = coach.targetDaysInStage
@@ -256,6 +263,21 @@ function CoachCard({
               <MessageSquare className="h-3 w-3" />
               <span>{coach.noteCount} note{coach.noteCount !== 1 ? 's' : ''}</span>
             </div>
+          )}
+
+          {/* Admin quick-advance button (not shown at Release) */}
+          {onAdvanceStage && coach.currentStage !== 'Release' && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onAdvanceStage(coach.id);
+              }}
+              className="mt-2 w-full rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+            >
+              Advance to {POH_STAGE_ORDER[POH_STAGE_ORDER.indexOf(coach.currentStage) + 1]}
+            </button>
           )}
         </Link>
       </div>

@@ -61,25 +61,26 @@ export async function advanceCoachStage(
     }
   }
 
-  // Check mandatory checklist items are complete for current stage
-  // (We check all mandatory items — in a real system you might check stage-specific ones)
-  const { data: incompleteItems } = await supabase
-    .from('coach_checklist_items')
-    .select('id, template:template_id(is_mandatory)')
-    .eq('coach_id', coachId)
-    .neq('status', 'Completed');
+  // Mandatory checklist validation only applies from Finishing stage onwards
+  if (POH_STAGE_ORDER.indexOf(currentStage) >= POH_STAGE_ORDER.indexOf('Finishing')) {
+    const { data: incompleteItems } = await supabase
+      .from('coach_checklist_items')
+      .select('id, template:template_id(is_mandatory)')
+      .eq('coach_id', coachId)
+      .neq('status', 'Completed');
 
-  if (incompleteItems) {
-    const incompleteMandatory = incompleteItems.filter((item) => {
-      const template = item.template as unknown as { is_mandatory: boolean } | null;
-      return template?.is_mandatory === true;
-    });
+    if (incompleteItems) {
+      const incompleteMandatory = incompleteItems.filter((item) => {
+        const template = item.template as unknown as { is_mandatory: boolean } | null;
+        return template?.is_mandatory === true;
+      });
 
-    if (incompleteMandatory.length > 0) {
-      return {
-        success: false,
-        error: `${incompleteMandatory.length} mandatory checklist item(s) must be completed before advancing`,
-      };
+      if (incompleteMandatory.length > 0) {
+        return {
+          success: false,
+          error: `${incompleteMandatory.length} mandatory checklist item(s) must be completed before advancing`,
+        };
+      }
     }
   }
 
