@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { ArrowLeft, BarChart3 } from 'lucide-react';
-import { getCoachSectionDashboard, getUserAssignedSection } from '@/lib/queries/section-dashboard';
+import { getCoachSectionDashboard, getUserAssignedSections } from '@/lib/queries/section-dashboard';
 import { Badge } from '@/components/ui/badge';
 import { SectionCard } from '@/components/sections/section-card';
 import { JobCardExportButton } from '@/components/sections/job-card-export-button';
@@ -14,9 +14,9 @@ interface SectionDashboardPageProps {
 export default async function SectionDashboardPage({ params }: SectionDashboardPageProps) {
   const { rakeId, coachId } = await params;
 
-  const [dashboardData, assignedSection] = await Promise.all([
+  const [dashboardData, assignedSections] = await Promise.all([
     getCoachSectionDashboard(coachId),
-    getUserAssignedSection(),
+    getUserAssignedSections(),
   ]);
 
   // Check if current user is admin
@@ -50,7 +50,12 @@ export default async function SectionDashboardPage({ params }: SectionDashboardP
     );
   }
 
-  const { coachNumber, coachType, rakeType, pohCycle, sections, aggregateCompletionPct } = dashboardData;
+  const { coachNumber, coachType, rakeType, pohCycle, sections: allSections, aggregateCompletionPct } = dashboardData;
+
+  // Non-Admin users: only show their assigned POH sections
+  const sections = isAdmin
+    ? allSections
+    : allSections.filter((s) => assignedSections.includes(s.sectionCode));
 
   // Check if job card has been generated (any section has work items)
   const hasJobCardData = sections.some(s => s.totalWorkItems > 0 || s.testsTotal > 0);
@@ -136,7 +141,7 @@ export default async function SectionDashboardPage({ params }: SectionDashboardP
       {/* Section cards grid */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {sections.map((section) => {
-          const isSSEAssigned = assignedSection === section.sectionCode;
+          const isSSEAssigned = assignedSections.includes(section.sectionCode);
           const isEditable = isAdmin || isSSEAssigned;
           return (
             <SectionCard

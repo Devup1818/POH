@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import type { POHStage, Result } from '@/types';
 import { POH_STAGE_ORDER, TARGET_DURATIONS } from '@/lib/constants';
 import { createNotificationForShed } from '@/lib/actions/notifications';
@@ -21,10 +22,10 @@ export async function advanceCoachStage(
 ): Promise<Result<{ newStage: POHStage }>> {
   const supabase = await createClient();
 
-  // Get current coach info
+  // Get current coach info with rake details
   const { data: coach, error: coachErr } = await supabase
     .from('coaches')
-    .select('id, rake_id, current_stage, stage_start_date')
+    .select('id, rake_id, current_stage, stage_start_date, coach_number, coach_type, rakes!inner(rake_type, poh_type)')
     .eq('id', coachId)
     .single();
 
@@ -34,6 +35,7 @@ export async function advanceCoachStage(
 
   const currentStage = coach.current_stage as POHStage;
   const next = nextStage(currentStage);
+  const rakeData = coach.rakes as unknown as { rake_type: string; poh_type: string };
 
   if (!next) {
     return { success: false, error: 'Coach is already at the final stage (Release)' };
@@ -134,6 +136,21 @@ export async function advanceCoachStage(
 
   if (updateErr) {
     return { success: false, error: updateErr.message };
+  }
+
+  // Auto-generate job card when coach enters Dismantling
+  if (next === 'Dismantling') {
+    try {
+      const adminClient = createAdminClient();
+      await adminClient.rpc('generate_job_card', {
+        p_coach_id: coachId,
+        p_rake_type: rakeData.rake_type,
+        p_coach_type: coach.coach_type ?? 'MC',
+        p_poh_cycle: rakeData.poh_type,
+      });
+    } catch {
+      // Job card generation failure should not block stage advancement
+    }
   }
 
   // --- Notification: Check if all coaches in the rake completed the same stage ---

@@ -1,10 +1,41 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
-import type { SectionDetailData, SectionWorkItem, MustChangeItemInstance, SectionTestInstance, M4CoordinationEntry, SectionCode } from '@/types';
+import { createAdminClient } from '@/lib/supabase/admin';
+import type { SectionDetailData, SectionWorkItem, MustChangeItemInstance, SectionTestInstance, M4CoordinationEntry, SectionCode, POHStage } from '@/types';
 
 export async function getSectionDetail(coachId: string, sectionCode: string): Promise<SectionDetailData | null> {
   const supabase = await createClient();
+
+  // Auto-generate job card if not yet generated for this coach
+  try {
+    const { count } = await supabase
+      .from('section_work_items')
+      .select('*', { count: 'exact', head: true })
+      .eq('coach_id', coachId)
+      .limit(1);
+
+    if (count === 0) {
+      const { data: coachInfo } = await supabase
+        .from('coaches')
+        .select('coach_type, rakes!inner(rake_type, poh_type)')
+        .eq('id', coachId)
+        .single();
+
+      if (coachInfo) {
+        const admin = createAdminClient();
+        const rakeData = coachInfo.rakes as unknown as { rake_type: string; poh_type: string };
+        await admin.rpc('generate_job_card', {
+          p_coach_id: coachId,
+          p_rake_type: rakeData.rake_type,
+          p_coach_type: (coachInfo as any).coach_type ?? 'MC',
+          p_poh_cycle: rakeData.poh_type,
+        });
+      }
+    }
+  } catch {
+    // Auto-generation failure should not block the page
+  }
 
   // Get workshop section metadata — fall back to constants if table doesn't exist
   let section: any = null;
@@ -44,10 +75,10 @@ export async function getSectionDetail(coachId: string, sectionCode: string): Pr
     };
   }
 
-  // Get coach's POH cycle from rake
+  // Get coach's POH cycle, stage, and type
   const { data: coach } = await supabase
     .from('coaches')
-    .select('id, rakes(poh_type)')
+    .select('id, current_stage, rakes(poh_type)')
     .eq('id', coachId)
     .single();
 
@@ -76,6 +107,11 @@ export async function getSectionDetail(coachId: string, sectionCode: string): Pr
         .single();
       isEditable = !!assignment;
     }
+  }
+
+  // Non-Admin users: block access to unassigned sections
+  if (user && !isEditable) {
+    return null;
   }
 
   // Fetch work items with WI details (resilient to missing tables)
@@ -190,12 +226,15 @@ export async function getSectionDetail(coachId: string, sectionCode: string): Pr
     }
   }
 
+  const coachStage = (coach as any)?.current_stage ?? 'Intake';
+
   return {
     sectionCode: section.section_code as SectionCode,
     nameHindi: section.name_hindi,
     nameEnglish: section.name_english,
     sectionType: section.section_type,
     pohCycle,
+    currentStage: coachStage as POHStage,
     isEditable,
     workItems,
     mustChangeItems,

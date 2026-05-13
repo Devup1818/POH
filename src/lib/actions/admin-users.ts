@@ -37,7 +37,7 @@ export async function fetchUsers(): Promise<Result<UserRecord[]>> {
     // Fetch all users
     const { data: users, error: usersError } = await supabase
       .from('users')
-      .select('id, email, full_name, role, is_active, created_at')
+      .select('id, email, username, full_name, role, is_active, created_at')
       .order('created_at', { ascending: true });
 
     if (usersError) {
@@ -91,6 +91,7 @@ export async function fetchUsers(): Promise<Result<UserRecord[]>> {
     const records: UserRecord[] = (users ?? []).map((u) => ({
       id: u.id,
       email: u.email,
+      username: u.username,
       full_name: u.full_name,
       role: u.role as UserRecord['role'],
       is_active: u.is_active,
@@ -152,7 +153,7 @@ export async function createUser(input: CreateUserInput): Promise<Result<UserRec
       return { success: false, error: firstError };
     }
 
-    const { email, full_name, role, shed_ids, section_assignments } = parsed.data;
+    const { email, username, full_name, role, shed_ids, section_assignments } = parsed.data;
     const adminClient = createAdminClient();
 
     // Create Supabase Auth account with default password
@@ -181,6 +182,7 @@ export async function createUser(input: CreateUserInput): Promise<Result<UserRec
         .insert({
           id: newUserId,
           email,
+          username,
           full_name,
           role,
           is_active: true,
@@ -231,7 +233,7 @@ export async function createUser(input: CreateUserInput): Promise<Result<UserRec
           entity_type: 'user',
           entity_id: newUserId,
           old_values: null,
-          new_values: { email, full_name, role, shed_ids, section_assignments },
+          new_values: { email, username, full_name, role, shed_ids, section_assignments },
         });
       } catch (auditErr) {
         console.error('Audit log insert failed:', auditErr);
@@ -243,6 +245,7 @@ export async function createUser(input: CreateUserInput): Promise<Result<UserRec
         return { success: true, data: {
           id: newUserId,
           email,
+          username,
           full_name,
           role: role as UserRecord['role'],
           is_active: true,
@@ -272,7 +275,7 @@ async function fetchUserById(userId: string): Promise<Result<UserRecord>> {
 
   const { data: user, error: userError } = await adminClient
     .from('users')
-    .select('id, email, full_name, role, is_active, created_at')
+    .select('id, email, username, full_name, role, is_active, created_at')
     .eq('id', userId)
     .single();
 
@@ -295,6 +298,7 @@ async function fetchUserById(userId: string): Promise<Result<UserRecord>> {
     data: {
       id: user.id,
       email: user.email,
+      username: user.username,
       full_name: user.full_name,
       role: user.role as UserRecord['role'],
       is_active: user.is_active,

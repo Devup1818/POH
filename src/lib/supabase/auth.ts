@@ -21,11 +21,28 @@ export async function signIn(email: string, password: string) {
 }
 
 export async function signInStep1(
-  email: string,
+  identifier: string,
   password: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; otpRequired?: boolean }> {
   try {
-    console.log('[DEBUG signInStep1] Starting for email:', email);
+    console.log('[DEBUG signInStep1] Starting for identifier:', identifier);
+
+    // If input doesn't look like an email, treat it as a username and look up the email
+    let email = identifier;
+    if (!identifier.includes('@')) {
+      const supabase = await createClient();
+      const { data: user } = await supabase
+        .from('users')
+        .select('email')
+        .eq('username', identifier)
+        .maybeSingle();
+      if (!user) {
+        return { success: false, error: 'Invalid username/email or password. Please check your credentials and try again.' };
+      }
+      email = user.email;
+    }
+
+    console.log('[DEBUG signInStep1] Resolved email:', email);
     const supabase = await createClient();
 
     // Step 1: Verify credentials
@@ -37,6 +54,12 @@ export async function signInStep1(
     if (signInError) {
       console.error('[DEBUG signInStep1] Password check failed:', signInError.message, '| status:', signInError.status);
       return { success: false, error: getUserFriendlyError(signInError.message) };
+    }
+
+    // If OTP/2FA is disabled, log in directly without OTP
+    if (process.env.DISABLE_OTP === 'true') {
+      console.log('[DEBUG signInStep1] OTP disabled — skipping 2FA for:', email);
+      return { success: true, otpRequired: false };
     }
 
     console.log('[DEBUG signInStep1] Password OK, signing out partial session...');
@@ -156,6 +179,7 @@ async function ensureUserProvisioned(userId: string, email: string): Promise<voi
         .insert({
           id: userId,
           email,
+          username: fullName,
           full_name: fullName,
           role: 'Viewer',
           is_active: true,
@@ -188,6 +212,28 @@ export async function resendOtp(): Promise<{
     }
     return { success: false, error: 'Failed to send verification code. Please try again.' };
   }
+
+  return { success: true };
+}
+
+export async function pauseTwoFactor(): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  const cookieStore = await cookies();
+  const email = cookieStore.get('poh_2fa_pending')?.value;
+
+  if (!email) {
+    return { success: false, error: 'No pending two-factor session to pause.' };
+  }
+
+  cookieStore.set('poh_2fa_pending', email, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 1800,
+  });
 
   return { success: true };
 }
@@ -238,10 +284,10 @@ function getUserFriendlyError(message: string): string {
     lower.includes('invalid_credentials') ||
     lower.includes('user not found')
   ) {
-    return 'Invalid email or password. Please check your credentials and try again.';
+    return 'Invalid username/email or password. Please check your credentials and try again.';
   }
   if (lower.includes('email not confirmed')) {
-    return 'Invalid email or password. Please check your credentials and try again.';
+    return 'Invalid username/email or password. Please check your credentials and try again.';
   }
   if (lower.includes('too many requests') || lower.includes('rate limit')) {
     return 'Too many login attempts. Please wait a moment and try again.';

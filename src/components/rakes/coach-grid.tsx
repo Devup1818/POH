@@ -46,6 +46,7 @@ const STAGE_BADGE_VARIANT: Record<POHStage, 'default' | 'info' | 'warning' | 'su
   Intake: 'gray',
   Dismantling: 'warning',
   Inspection: 'default',
+  Overhaul: 'default',
   Reassembly: 'info',
   Finishing: 'purple',
   Testing: 'blue',

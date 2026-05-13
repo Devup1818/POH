@@ -28,7 +28,7 @@ export function UserListTable({ users, sheds, onRefresh }: UserListTableProps) {
   const filtered = useMemo(() => {
     return users.filter((u) => {
       const q = search.toLowerCase();
-      const matchesSearch = !q || u.full_name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+      const matchesSearch = !q || u.full_name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.username.toLowerCase().includes(q);
       const matchesRole = !roleFilter || u.role === roleFilter;
       const matchesShed = !shedFilter || u.shed_assignments.some((s) => s.shed_id === shedFilter);
       return matchesSearch && matchesRole && matchesShed;
@@ -128,6 +128,7 @@ export function UserListTable({ users, sheds, onRefresh }: UserListTableProps) {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Name</th>
+              <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Username</th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Email</th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Role</th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">Shed(s)</th>
@@ -139,7 +140,7 @@ export function UserListTable({ users, sheds, onRefresh }: UserListTableProps) {
           <tbody className="divide-y divide-gray-200">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-sm text-gray-500">
                   No users found matching your filters.
                 </td>
               </tr>
@@ -149,6 +150,7 @@ export function UserListTable({ users, sheds, onRefresh }: UserListTableProps) {
                   <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-gray-900">
                     {user.full_name}
                   </td>
+                  <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">{user.username}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-gray-500">{user.email}</td>
                   <td className="whitespace-nowrap px-4 py-3">
                     <Badge variant={roleBadgeColor(user.role) as 'info' | 'success' | 'warning' | 'gray'}>

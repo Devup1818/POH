@@ -35,6 +35,7 @@ export function UserFormModal({ open, onClose, onSuccess, user, sheds }: UserFor
   const isEdit = !!user;
 
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState<UserRole>('Technician');
   const [selectedSheds, setSelectedSheds] = useState<string[]>([]);
@@ -47,6 +48,7 @@ export function UserFormModal({ open, onClose, onSuccess, user, sheds }: UserFor
     if (open) {
       if (user) {
         setEmail(user.email);
+        setUsername(user.username);
         setFullName(user.full_name);
         setRole(user.role);
         setSelectedSheds(user.shed_assignments.map((s) => s.shed_id));
@@ -59,6 +61,7 @@ export function UserFormModal({ open, onClose, onSuccess, user, sheds }: UserFor
         );
       } else {
         setEmail('');
+        setUsername('');
         setFullName('');
         setRole('Technician');
         setSelectedSheds([]);
@@ -127,7 +130,7 @@ export function UserFormModal({ open, onClose, onSuccess, user, sheds }: UserFor
 
     const formData = isEdit
       ? { user_id: user!.id, full_name: fullName, role, shed_ids: selectedSheds, section_assignments: sectionAssignments }
-      : { email, full_name: fullName, role, shed_ids: selectedSheds, section_assignments: sectionAssignments };
+      : { email, username, full_name: fullName, role, shed_ids: selectedSheds, section_assignments: sectionAssignments };
 
     const schema = isEdit ? updateUserSchema : createUserSchema;
     const validation = schema.safeParse(formData);
@@ -170,6 +173,10 @@ export function UserFormModal({ open, onClose, onSuccess, user, sheds }: UserFor
         <Input id="email" label="Email" type="email" value={email}
           onChange={(e) => setEmail(e.target.value)} disabled={isEdit}
           error={errors.email} placeholder="user@example.com" />
+
+        <Input id="username" label="Username" value={username}
+          onChange={(e) => setUsername(e.target.value)} disabled={isEdit}
+          error={errors.username} placeholder="Enter username" />
 
         <Input id="full_name" label="Full Name" value={fullName}
           onChange={(e) => setFullName(e.target.value)}

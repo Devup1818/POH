@@ -19,14 +19,15 @@ export async function middleware(request: NextRequest) {
   const isOtpVerifyRoute = pathname === OTP_VERIFY_ROUTE;
   const isLoginRoute = pathname === '/login';
   const isPublicRoute = PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
+  const is2faDisabled = process.env.DISABLE_OTP === 'true';
 
   // --- OTP Verification Page routing ---
-  if (isOtpVerifyRoute && !has2faPending) {
+  if (!is2faDisabled && isOtpVerifyRoute && !has2faPending) {
     const loginUrl = new URL('/login', request.url);
     return NextResponse.redirect(loginUrl);
   }
 
-  if (isOtpVerifyRoute && has2faPending) {
+  if (!is2faDisabled && isOtpVerifyRoute && has2faPending) {
     return response;
   }
 
@@ -52,14 +53,14 @@ export async function middleware(request: NextRequest) {
   }
 
   // --- 2FA pending state enforcement ---
-  if (has2faPending && !isPublicRoute) {
+  if (!is2faDisabled && has2faPending && !isPublicRoute) {
     const otpUrl = new URL(OTP_VERIFY_ROUTE, request.url);
     return NextResponse.redirect(otpUrl);
   }
 
   // --- Login page routing ---
   if (isLoginRoute) {
-    if (user && has2faPending) {
+    if (!is2faDisabled && user && has2faPending) {
       const otpUrl = new URL(OTP_VERIFY_ROUTE, request.url);
       return NextResponse.redirect(otpUrl);
     }

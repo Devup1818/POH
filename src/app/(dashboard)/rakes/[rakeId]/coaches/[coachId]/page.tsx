@@ -27,6 +27,7 @@ import {
   type NoteDetail,
 } from '@/lib/queries/coach';
 import { useCoachPartsRealtime } from '@/lib/supabase/realtime';
+import { createClient } from '@/lib/supabase/client';
 import type { TimelineStatus } from '@/types';
 import type { MockPart } from '@/lib/mock-data';
 import type { PartStatus } from '@/types';
@@ -47,6 +48,15 @@ export default function CoachDetailPage() {
     nextCoachId: string | null;
     rakeAvgProgress: number;
   }>({ prevCoachId: null, nextCoachId: null, rakeAvgProgress: 0 });
+
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Reset tab if hidden for current user
+  useEffect(() => {
+    if (!isAdmin && (activeTab === 'parts' || activeTab === 'checklist' || activeTab === 'testing')) {
+      setActiveTab('overview');
+    }
+  }, [isAdmin, activeTab]);
 
   // Advance stage state
   const [showAdvanceConfirm, setShowAdvanceConfirm] = useState(false);
@@ -88,16 +98,27 @@ export default function CoachDetailPage() {
     let cancelled = false;
     setLoading(true);
 
+    const supabase = createClient();
     Promise.all([
       getCoachDetail(coachId),
       getCoachChecklistItems(coachId),
       getCoachNotes(coachId),
       getCoachSiblings(rakeId, coachId),
-    ]).then(([coachData, clItems, noteData, siblingData]) => {
+      supabase.auth.getUser().then(async ({ data: { user } }) => {
+        if (!user) return false;
+        const { data } = await supabase
+          .from('users')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        return data?.role === 'Admin';
+      }).catch(() => false),
+    ]).then(([coachData, clItems, noteData, siblingData, admin]) => {
       if (!cancelled) {
+        setIsAdmin(admin);
         setCoach(coachData);
         if (coachData?.parts) {
-          setCurrentParts(coachData.parts.map((p) => ({
+          setCurrentParts(coachData.parts.map((p: any) => ({
             id: p.id,
             coachId: coachData.id,
             partName: p.partName as any,
@@ -134,7 +155,7 @@ export default function CoachDetailPage() {
         ]);
         setCoach(coachData);
         if (coachData?.parts) {
-          setCurrentParts(coachData.parts.map((p) => ({
+          setCurrentParts(coachData.parts.map((p: any) => ({
             id: p.id,
             coachId: coachData.id,
             partName: p.partName as any,
@@ -360,6 +381,7 @@ export default function CoachDetailPage() {
         onTabChange={setActiveTab}
         noteCount={notes.length}
         testingDisabled={!derived.isInTestingOrLater}
+        hiddenTabs={isAdmin ? undefined : ['parts', 'checklist', 'testing']}
       />
 
       <div className="mt-1">
@@ -380,15 +402,15 @@ export default function CoachDetailPage() {
           </div>
         )}
 
-        {activeTab === 'parts' && (
+        {activeTab === 'parts' && isAdmin && (
           <PartsTracker parts={currentParts} onPartsChange={handlePartsChange} />
         )}
 
-        {activeTab === 'checklist' && (
+        {activeTab === 'checklist' && isAdmin && (
           <ChecklistManager items={checklistForManager} coachId={coachId} />
         )}
 
-        {activeTab === 'testing' && (
+        {activeTab === 'testing' && isAdmin && (
           <TestingPanel tests={testsForPanel} currentStage={coach.currentStage} />
         )}
 

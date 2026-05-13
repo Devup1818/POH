@@ -31,6 +31,7 @@ describe('Bug 1: handleSubmit loading state reset', () => {
 
     vi.doMock('@/lib/supabase/auth', () => ({
       signInStep1: vi.fn().mockResolvedValue({ success: true }),
+      getPending2faEmail: vi.fn().mockResolvedValue(null),
     }));
 
     const { default: LoginPage } = await import('@/app/(auth)/login/page');
@@ -76,6 +77,7 @@ describe('Bug 2: handleSubmit error handling', () => {
         success: false,
         error: 'Invalid email or password. Please check your credentials and try again.',
       }),
+      getPending2faEmail: vi.fn().mockResolvedValue(null),
     }));
 
     const { default: LoginPage } = await import('@/app/(auth)/login/page');
@@ -155,6 +157,7 @@ describe('Bug 3: Session timeout reason display', () => {
 
     vi.doMock('@/lib/supabase/auth', () => ({
       signInStep1: vi.fn(),
+      getPending2faEmail: vi.fn().mockResolvedValue(null),
     }));
 
     const { default: LoginPage } = await import('@/app/(auth)/login/page');

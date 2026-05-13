@@ -237,6 +237,7 @@ describe('UI Preservation: Error clearing on input change', () => {
         success: false,
         error: 'Invalid email or password. Please check your credentials and try again.',
       }),
+      getPending2faEmail: vi.fn().mockResolvedValue(null),
     }));
 
     const { default: LoginPage } = await import('@/app/(auth)/login/page');
@@ -282,6 +283,7 @@ describe('UI Preservation: Successful sign-in redirects to OTP page', () => {
 
     vi.doMock('@/lib/supabase/auth', () => ({
       signInStep1: vi.fn().mockResolvedValue({ success: true }),
+      getPending2faEmail: vi.fn().mockResolvedValue(null),
     }));
 
     const { default: LoginPage } = await import('@/app/(auth)/login/page');
@@ -316,6 +318,7 @@ describe('UI Preservation: Sign-in button disabled state', () => {
 
     vi.doMock('@/lib/supabase/auth', () => ({
       signInStep1: vi.fn(),
+      getPending2faEmail: vi.fn().mockResolvedValue(null),
     }));
 
     const { default: LoginPage } = await import('@/app/(auth)/login/page');

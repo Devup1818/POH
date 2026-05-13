@@ -83,6 +83,7 @@ export interface SectionInChargeAssignment {
 export interface UserRecord {
   id: string;
   email: string;
+  username: string;
   full_name: string;
   role: UserRole;
   is_active: boolean;
@@ -93,6 +94,7 @@ export interface UserRecord {
 
 export interface CreateUserInput {
   email: string;
+  username: string;
   full_name: string;
   role: UserRole;
   shed_ids: string[];
@@ -268,6 +270,7 @@ export interface SectionDetailData {
   nameEnglish: string;
   sectionType: SectionType;
   pohCycle: string;
+  currentStage: POHStage;
   isEditable: boolean;
   workItems: SectionWorkItem[];
   mustChangeItems: MustChangeItemInstance[];

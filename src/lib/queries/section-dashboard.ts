@@ -130,18 +130,23 @@ export async function getCoachSectionDashboard(coachId: string): Promise<Section
   };
 }
 
-// Get current user's assigned section for SSE highlighting
-export async function getUserAssignedSection(): Promise<string | null> {
+// Get all POH sections assigned to the current user
+export async function getUserAssignedSections(): Promise<string[]> {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  if (!user) return [];
 
   const { data } = await supabase
     .from('user_section_assignments')
     .select('sub_section')
     .eq('user_id', user.id)
-    .limit(1)
-    .single();
+    .not('sub_section', 'is', null);
 
-  return data?.sub_section ?? null;
+  return [...new Set(data?.map((d) => d.sub_section).filter(Boolean) as string[])];
+}
+
+// Legacy: returns single assigned section (kept for backward compat)
+export async function getUserAssignedSection(): Promise<string | null> {
+  const sections = await getUserAssignedSections();
+  return sections[0] ?? null;
 }

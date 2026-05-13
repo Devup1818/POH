@@ -10,6 +10,11 @@ const sectionAssignmentSchema = z.object({
 
 export const createUserSchema = z.object({
   email: z.string().email('Enter a valid email address'),
+  username: z
+    .string()
+    .min(1, 'Username is required')
+    .max(100, 'Username must be 100 characters or less')
+    .regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores'),
   full_name: z
     .string()
     .min(1, 'Full name is required')

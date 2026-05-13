@@ -8,6 +8,7 @@ const STAGE_COLORS: Record<POHStage, { bar: string; text: string }> = {
   Intake: { bar: 'bg-slate-400', text: 'text-slate-600' },
   Dismantling: { bar: 'bg-orange-400', text: 'text-orange-600' },
   Inspection: { bar: 'bg-amber-400', text: 'text-amber-600' },
+  Overhaul: { bar: 'bg-rose-400', text: 'text-rose-600' },
   Reassembly: { bar: 'bg-sky-400', text: 'text-sky-600' },
   Finishing: { bar: 'bg-indigo-400', text: 'text-indigo-600' },
   Testing: { bar: 'bg-violet-400', text: 'text-violet-600' },

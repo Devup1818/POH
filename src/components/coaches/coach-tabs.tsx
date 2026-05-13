@@ -17,13 +17,16 @@ export interface CoachTabsProps {
   onTabChange: (tab: CoachTab) => void;
   noteCount?: number;
   testingDisabled?: boolean;
+  hiddenTabs?: CoachTab[];
 }
 
-export function CoachTabs({ activeTab, onTabChange, noteCount, testingDisabled }: CoachTabsProps) {
+export function CoachTabs({ activeTab, onTabChange, noteCount, testingDisabled, hiddenTabs }: CoachTabsProps) {
+  const visibleTabs = TAB_LABELS.filter(({ key }) => !hiddenTabs?.includes(key));
+
   return (
     <nav className="border-b border-gray-200" aria-label="Coach detail tabs">
       <div className="-mb-px flex space-x-2 sm:space-x-6 overflow-x-auto px-1 scrollbar-none">
-        {TAB_LABELS.map(({ key, label }) => {
+        {visibleTabs.map(({ key, label }) => {
           const isActive = activeTab === key;
           const isDisabled = key === 'testing' && testingDisabled;
 

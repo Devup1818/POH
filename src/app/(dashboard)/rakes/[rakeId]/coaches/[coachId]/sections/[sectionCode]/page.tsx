@@ -1,8 +1,10 @@
 import Link from 'next/link';
 import { ArrowLeft, Lock, Pencil } from 'lucide-react';
 import { getSectionDetail } from '@/lib/queries/section-detail';
+import { getSectionStageCompletion } from '@/lib/actions/section-stage-completion';
 import { Badge } from '@/components/ui/badge';
 import { SectionDetailTabs } from '@/components/sections/section-detail-tabs';
+import { StageCompletionButton } from '@/components/sections/stage-completion-button';
 
 interface SectionDetailPageProps {
   params: Promise<{ rakeId: string; coachId: string; sectionCode: string }>;
@@ -27,12 +29,15 @@ export default async function SectionDetailPage({ params }: SectionDetailPagePro
     nameEnglish,
     sectionType,
     pohCycle,
+    currentStage,
     isEditable,
     workItems,
     mustChangeItems,
     tests,
     m4Entries,
   } = data;
+
+  const stageCompleted = await getSectionStageCompletion(coachId, code, currentStage).catch(() => false);
 
   return (
     <div className="space-y-5">
@@ -69,13 +74,24 @@ export default async function SectionDetailPage({ params }: SectionDetailPagePro
             <p className="mt-1 text-base text-gray-700">{nameEnglish}</p>
           </div>
 
-          <div className="text-right">
-            <Badge variant="purple" size="lg">{pohCycle}</Badge>
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2">
+              <Badge variant="purple" size="lg">{pohCycle}</Badge>
+              {isEditable && (
+                <StageCompletionButton
+                  rakeId={rakeId}
+                  coachId={coachId}
+                  sectionCode={code}
+                  currentStage={currentStage}
+                  alreadyCompleted={stageCompleted}
+                />
+              )}
+            </div>
             {sectionType === 'coordination' && (
-              <p className="mt-1 text-xs text-gray-500">Coordination Section</p>
+              <p className="text-xs text-gray-500">Coordination Section</p>
             )}
             {sectionType === 'placeholder' && (
-              <p className="mt-1 text-xs text-gray-500">Placeholder WIs</p>
+              <p className="text-xs text-gray-500">Placeholder WIs</p>
             )}
           </div>
         </div>
