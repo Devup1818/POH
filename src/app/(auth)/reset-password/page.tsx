@@ -19,30 +19,32 @@ function ResetPasswordForm() {
 
   useEffect(() => {
     const supabase = createClient();
-    const code = searchParams.get('code');
 
-    async function init() {
-      if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
-        if (error) {
-          setError('Invalid or expired reset link. Please request a new one.');
-          setVerifying(false);
-          return;
-        }
-        setSessionReady(true);
-        setVerifying(false);
-      } else {
-        // Check if already authenticated (direct access with hash from email)
+    // The SSR client auto-exchanges PKCE code on init.
+    // Wait briefly for it to complete, then check if session is ready.
+    let cancelled = false;
+
+    async function checkSession() {
+      // Retry up to 5 seconds to allow PKCE exchange to complete
+      for (let i = 0; i < 10; i++) {
+        if (cancelled) return;
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
           setSessionReady(true);
+          setVerifying(false);
+          return;
         }
+        await new Promise((r) => setTimeout(r, 500));
+      }
+      if (!cancelled) {
+        setError('Invalid or expired reset link. Please request a new one.');
         setVerifying(false);
       }
     }
 
-    init();
-  }, [searchParams]);
+    checkSession();
+    return () => { cancelled = true; };
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
