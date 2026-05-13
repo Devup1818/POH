@@ -298,7 +298,7 @@ export async function forgotPassword(
 
     const origin = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
     const { error } = await supabase.auth.resetPasswordForEmail(resolvedEmail, {
-      redirectTo: `${origin}/login/reset-password`,
+      redirectTo: `${origin}/reset-password`,
     });
 
     if (error) {

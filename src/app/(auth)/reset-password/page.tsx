@@ -1,31 +1,48 @@
 'use client';
 
-import { useState, useTransition, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState, useTransition, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { KeyRound, AlertCircle, CheckCircle2, Loader2, Lock } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { resetPassword } from '@/lib/supabase/auth';
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [sessionReady, setSessionReady] = useState(false);
+  const [verifying, setVerifying] = useState(true);
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
+    const code = searchParams.get('code');
+
+    async function init() {
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          setError('Invalid or expired reset link. Please request a new one.');
+          setVerifying(false);
+          return;
+        }
         setSessionReady(true);
+        setVerifying(false);
+      } else {
+        // Check if already authenticated (direct access with hash from email)
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          setSessionReady(true);
+        }
+        setVerifying(false);
       }
-    });
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setSessionReady(true);
-    });
-  }, []);
+    }
+
+    init();
+  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -76,10 +93,23 @@ export default function ResetPasswordPage() {
         Enter your new password below
       </p>
 
-      {!sessionReady ? (
+      {verifying ? (
         <div className="flex flex-col items-center gap-3 py-4">
           <Loader2 className="h-8 w-8 animate-spin text-amber-300" />
           <p className="text-sm text-white/60">Verifying reset link...</p>
+        </div>
+      ) : !sessionReady ? (
+        <div className="flex flex-col items-center gap-3 py-4">
+          <AlertCircle className="h-8 w-8 text-red-300" />
+          <p className="text-sm text-red-200 text-center">
+            {error || 'Invalid or expired reset link. Please request a new one.'}
+          </p>
+          <a
+            href="/forgot-password"
+            className="text-sm font-medium text-amber-300 hover:text-amber-200 transition-colors"
+          >
+            Request new reset link
+          </a>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -146,5 +176,20 @@ export default function ResetPasswordPage() {
         </form>
       )}
     </div>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="rounded-xl border border-white/20 bg-white/10 backdrop-blur-xl p-8 shadow-2xl w-full max-w-sm">
+        <div className="flex flex-col items-center gap-3 py-4">
+          <Loader2 className="h-8 w-8 animate-spin text-amber-300" />
+          <p className="text-sm text-white/60">Verifying reset link...</p>
+        </div>
+      </div>
+    }>
+      <ResetPasswordForm />
+    </Suspense>
   );
 }
