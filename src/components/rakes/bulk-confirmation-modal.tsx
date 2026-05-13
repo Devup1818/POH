@@ -373,9 +373,8 @@ export function BulkConfirmationModal({
         {action === 'mark-stage-complete' && (
           <div className="rounded-lg bg-amber-50 border border-amber-200 p-3">
             <p className="text-xs text-amber-700">
-              Individual timestamps will be recorded for each coach. Coaches with
-              incomplete mandatory checklist items or missing test completions may
-              fail validation.
+              Individual timestamps will be recorded for each coach. Mandatory
+              checklist validation only applies from Finishing stage onwards.
             </p>
           </div>
         )}
